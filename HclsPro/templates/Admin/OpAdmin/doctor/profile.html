@@ -1,0 +1,97 @@
+{% extends 'Admin/OpAdmin/doctor/doctorbase.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row gy-4">
+        <div class="col-lg-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <img src="{% static 'images/hlogo2.png' %}" alt="Profile avatar" class="rounded-circle" width="120" height="120">
+                    </div>
+                    <h4 class="mb-1">{{ actor.display_name }}</h4>
+                    <p class="text-muted mb-2">{{ actor.email }}</p>
+                    <span class="badge bg-secondary">{{ actor.role|title }}</span>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Quick links</h5>
+                    <a href="{% url 'doctor_dashboard' %}" class="btn btn-outline-primary w-100 mb-2">Return to dashboard</a>
+                    <a href="{% url 'doctor_profile' %}" class="btn btn-outline-secondary w-100 mb-2">Profile</a>
+                    <a href="{% url 'logout' %}" class="btn btn-outline-secondary w-100">Log out</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Profile details</h5>
+                    <form method="post" action="" class="row g-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="update_profile">
+                        <div class="col-md-6">
+                            <label class="form-label">Name</label>
+                            <input name="name" type="text" class="form-control" value="{{ account.Dname|default:account.Rname|default:account.Hname|default:'' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input name="phone" type="tel" class="form-control" value="{{ account.Phone|default:'' }}">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Email</label>
+                            <input name="email" type="email" class="form-control" value="{{ account.Email|default:'' }}">
+                        </div>
+                        {% if actor.user_type == 'doctor' %}
+                        <div class="col-md-12">
+                            <label class="form-label">Specialization</label>
+                            <input type="text" class="form-control" value="{{ account.Specialization|default:'General Practice' }}" readonly>
+                        </div>
+                        {% endif %}
+                        <div class="col-12 text-end">
+                            <button type="submit" class="btn btn-primary">Save changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Change password</h5>
+                    {% if password_message %}
+                        <div class="alert alert-{{ password_level|default:'danger' }}">{{ password_message }}</div>
+                    {% endif %}
+                    <form method="post" action="" class="row g-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="change_password">
+                        <div class="col-md-12">
+                            <label class="form-label">Current password</label>
+                            <input name="current_password" type="password" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">New password</label>
+                            <input name="new_password" type="password" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Confirm new password</label>
+                            <input name="confirm_password" type="password" class="form-control" required>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button type="submit" class="btn btn-outline-primary">Update password</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

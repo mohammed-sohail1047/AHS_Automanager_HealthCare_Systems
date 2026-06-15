@@ -47,14 +47,14 @@
 					{% if receptionists %}
 						{% for r in receptionists %}
 							<tr>
-								<td>{{ r.id }}</td>
-								<td>{{ r.name }}</td>
-								<td>{{ r.phone }}</td>
+								<td>{{ r.RecID }}</td>
+								<td>{{ r.Rname }}</td>
+								<td>{{ r.Phone }}</td>
 								<td class="text-end">
 									<a href="#" class="btn btn-sm btn-outline-primary">Edit</a>
 									<form method="post" action="{% url 'receptionistmanage' %}" class="d-inline-block ms-1 delete-form">
 										{% csrf_token %}
-										<input type="hidden" name="delete_id" value="{{ r.id }}">
+										<input type="hidden" name="delete_id" value="{{ r.RecID }}">
 										<button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
 									</form>
 								</td>

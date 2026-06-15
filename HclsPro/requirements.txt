@@ -1,0 +1,17 @@
+﻿asgiref==3.11.1
+cffi==2.0.0
+cryptography==48.0.0
+Django==6.0.2
+djangorestframework==3.16.1
+drf-yasg==1.21.14
+inflection==0.5.1
+mysqlclient==2.2.8
+packaging==26.0
+pillow==12.1.1
+pycparser==3.0
+PyMySQL==1.1.3
+pytz==2025.2
+PyYAML==6.0.3
+sqlparse==0.5.5
+tzdata==2025.3
+uritemplate==4.2.0

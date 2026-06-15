@@ -17,17 +17,24 @@
         </a>
     </div>
 
-    <!-- Card -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" role="alert">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
     <div class="card shadow-lg border-0">
         <div class="card-body">
+            <form method="get" class="row g-2 mb-4" role="search">
+                <div class="col-sm-8">
+                    <input type="search" name="q" class="form-control" placeholder="Search doctor by name, specialization or email" value="{{ query|default:'' }}">
+                </div>
+                <div class="col-sm-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <a href="{% url 'doctormanage' %}" class="btn btn-danger">Reset</a>
+                </div>
+            </form>
 
-            <!-- Search -->
-            <div class="mb-3">
-                <input type="text" class="form-control"
-                       placeholder="Search doctor by name or specialization...">
-            </div>
-
-            <!-- Table -->
             <div class="table-responsive">
                 <table class="table table-hover align-middle text-center">
                     <thead class="table-dark">
@@ -36,40 +43,37 @@
                             <th>Name</th>
                             <th>Specialization</th>
                             <th>Phone</th>
+                            <th>Email</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        <!-- Example Row -->
-                        <!-- <tr>
-                            <td>1</td>
-                            <td>Dr. John</td>
-                            <td>Cardiologist</td>
-                            <td>9876543210</td>
-                            <td>
-                                <a href="#" class="btn btn-sm btn-warning">
-                                    <i class="bi bi-pencil-square"></i>
-                                </a>
-                                <a href="#" class="btn btn-sm btn-danger">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                            </td>
-                        </tr> -->
-
-                        <!-- If No Data -->
-                        
-                        <tr>
-                            <td colspan="5" class="text-muted">
-                                No doctors available.
-                            </td>
-                        </tr>
-                        
-
+                        {% if doctors and doctors.exists %}
+                            {% for doctor in doctors %}
+                                <tr>
+                                    <td>{{ doctor.DocID }}</td>
+                                    <td>{{ doctor.Dname }}</td>
+                                    <td>{{ doctor.Specialization }}</td>
+                                    <td>{{ doctor.Phone }}</td>
+                                    <td>{{ doctor.Email }}</td>
+                                    <td>
+                                        <form method="post" action="{% url 'doctormanage' %}" class="d-inline-block">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="delete_id" value="{{ doctor.DocID }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-muted">No doctors found.</td>
+                            </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
-
         </div>
     </div>
 

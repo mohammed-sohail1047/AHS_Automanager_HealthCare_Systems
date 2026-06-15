@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.shortcuts import redirect, render
 from HclsWebApi.models import (
     CheckLogin,
@@ -12,12 +13,21 @@ from HclsWebApi.models import (
     Helper,
 )
 from django.contrib import messages
-from .decorators import login_required, mAdmin_only, opAdmin_only, already_authenticated, normalize_admin_type
+from .decorators import login_required, mAdmin_only, opAdmin_only, already_authenticated, normalize_admin_type, doctor_only
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 from .repositories.django_admin_repository import DjangoAdminRepository
+from HclsWebApi.authentication import (
+    apply_auth_cookies,
+    authenticate_user,
+    clear_auth_cookies,
+    get_account_for_password_reset,
+    get_dashboard_route_for_role,
+    issue_token_pair,
+    set_account_password,
+)
 # from .decorators import login_required, already_authenticated, mAdmin_only, opAdmin_only
 
 
@@ -86,31 +96,23 @@ def login(request):
         email = request.POST.get('username')
         password = request.POST.get('password')
 
-        user = CheckLogin.objects.filter(email=email).first()
+        remember_me = request.POST.get('remember') == 'on'
+        result = authenticate_user(email, password)
 
-        if user and user.check_password(password):
+        if result["status"] == "inactive_admin":
             # 🔥 redirect if not activated
-            if not user.status:
-                return redirect('activate_admin', id=user.id)
+            return redirect('activate_admin', id=result["user"].id)
 
-            normalized_type = normalize_admin_type(user.admin_type)
+        if result["status"] in {"inactive_staff", "password_not_set"}:
+            return render(request, 'Admin/Anonymous/login.html', {'error': result["message"]})
 
-            if not normalized_type:
-                return render(request, 'Admin/Anonymous/login.html', {
-                    'error': 'Invalid admin type. Contact support.'
-                })
+        if result["status"] == "ok":
+            payload = result["payload"]
+            tokens = issue_token_pair(payload, remember_me=remember_me)
+            response = redirect(get_dashboard_route_for_role(payload["role"]))
+            return apply_auth_cookies(response, tokens, remember_me=remember_me)
 
-            request.session['admin_id'] = user.id
-            request.session['admin_type'] = normalized_type
-
-            if normalized_type == "MADMIN":
-                return redirect('dashboard')
-            else:
-                return redirect('OAdashboard')
-
-        return render(request, 'Admin/Anonymous/login.html', {
-            'error': 'Invalid credentials'
-        })
+        return render(request, 'Admin/Anonymous/login.html', {'error': 'Invalid credentials'})
 
     return render(request, 'Admin/Anonymous/login.html')
 
@@ -213,7 +215,7 @@ def dashboard(request):
     admins = CheckLogin.objects.select_related('created_by').all()
     today = timezone.localdate()
 
-    current_admin_id = request.session.get('admin_id')
+    current_admin_id = request.current_actor.id
     opadmins = []
     active_count = 0
     inactive_count = 0
@@ -316,47 +318,81 @@ def dashboard(request):
 @mAdmin_only
 def profile(request):
     try:
-        admin_id = request.session.get('admin_id')
+        admin_id = request.current_actor.id
         admin = CheckLogin.objects.get(id=admin_id)
-        message = None
+        password_modal_open = False
+        password_message = None
+        password_message_level = None
 
         # Handle POST from MAdmin profile edit form (save changes + avatar)
         if request.method == 'POST':
-            name = request.POST.get('name')
-            phone = request.POST.get('phone')
-            address = request.POST.get('address')
-            gender = request.POST.get('gender')
-            avatar_file = request.FILES.get('avatar')
+            form_type = request.POST.get('form_type')
+            current_password = request.POST.get('current_password')
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
 
-            print('MAdmin profile POST:', {'name': name, 'phone': phone, 'address': address, 'gender': gender, 'has_avatar': bool(avatar_file)})
+            if form_type == 'change_password':
+                password_modal_open = True
 
-            if name:
-                admin.username = name
-            if phone is not None:
-                admin.phone = phone
-            if address is not None:
-                admin.address = address
-            if gender is not None:
-                admin.gender = gender
-            if avatar_file:
-                admin.avatar = avatar_file
+                if not current_password or not new_password or not confirm_password:
+                    password_message = 'Please fill in all password fields.'
+                    password_message_level = 'danger'
+                elif not admin.check_password(current_password):
+                    password_message = 'Current password is incorrect.'
+                    password_message_level = 'danger'
+                elif new_password != confirm_password:
+                    password_message = 'New password and confirm password do not match.'
+                    password_message_level = 'danger'
+                elif len(new_password) < 8:
+                    password_message = 'New password must be at least 8 characters long.'
+                    password_message_level = 'danger'
+                else:
+                    try:
+                        admin.password = new_password
+                        admin.save()
+                        messages.success(request, 'Password changed successfully.')
+                        return redirect('profile')
+                    except Exception as e:
+                        print('Error changing MAdmin password:', str(e))
+                        messages.error(request, f'Error changing password: {e}')
+            else:
+                name = request.POST.get('name')
+                phone = request.POST.get('phone')
+                address = request.POST.get('address')
+                gender = request.POST.get('gender')
+                avatar_file = request.FILES.get('avatar')
 
-            try:
-                admin.save()
-                messages.success(request, 'Profile updated successfully.')
-                return redirect('profile')
-            except Exception as e:
-                print('Error saving MAdmin profile:', str(e))
-                messages.error(request, f'Error saving profile: {e}')
+                print('MAdmin profile POST:', {'name': name, 'phone': phone, 'address': address, 'gender': gender, 'has_avatar': bool(avatar_file)})
+
+                if name:
+                    admin.username = name
+                if phone is not None:
+                    admin.phone = phone
+                if address is not None:
+                    admin.address = address
+                if gender is not None:
+                    admin.gender = gender
+                if avatar_file:
+                    admin.avatar = avatar_file
+
+                try:
+                    admin.save()
+                    messages.success(request, 'Profile updated successfully.')
+                    return redirect('profile')
+                except Exception as e:
+                    print('Error saving MAdmin profile:', str(e))
+                    messages.error(request, f'Error saving profile: {e}')
 
         context = {
             'admin': admin,
             'admin_username': admin.username,
             'admin_email': admin.email,
+            'password_modal_open': password_modal_open,
+            'password_message': password_message,
+            'password_message_level': password_message_level,
         }
     except CheckLogin.DoesNotExist:
-        request.session.flush()
-        return redirect('login')
+        return clear_auth_cookies(redirect('login'))
     
     return render(request, 'Admin/MAdmin/profile_new.html', context)
 
@@ -393,7 +429,7 @@ def add_operational_admin(request):
         # Create new Operational Admin
         # attach creator from session (if available)
         creator = None
-        creator_id = request.session.get('admin_id')
+        creator_id = request.current_actor.id
         if creator_id:
             creator = CheckLogin.objects.filter(id=creator_id).first()
 
@@ -426,7 +462,7 @@ def manage(request):
 
     # scope: 'my' (only records created by current MAdmin) or 'all'
     scope = request.GET.get('scope', 'my')
-    current_admin_id = request.session.get('admin_id')
+    current_admin_id = request.current_actor.id
 
     # Build items list containing only Operational Admins with requested columns
     items = []
@@ -526,7 +562,7 @@ def OAdashboard(request):
     appointments_today = Patient.objects.filter(EntryDateandTime__date=today).count()
     admissions_pending = Patient.objects.filter(IsAdmitted=True, ExitDateandTime__isnull=True).count()
     lab_results_pending = max(Patient.objects.filter(IsAdmitted=True).count() - Patient.objects.exclude(Medication='').count(), 0)
-    unread_messages = CheckLogin.objects.filter(status=False, created_by_id=request.session.get('admin_id')).count()
+    unread_messages = CheckLogin.objects.filter(status=False, created_by_id=request.current_actor.id).count()
 
     recent_patients = Patient.objects.select_related('DoctorID').order_by('-EntryDateandTime')[:6]
     operations = []
@@ -538,7 +574,7 @@ def OAdashboard(request):
             'level': 'warning' if patient.IsAdmitted else 'info',
         })
 
-    recent_opadmins = CheckLogin.objects.filter(created_by_id=request.session.get('admin_id')).order_by('-created_on')[:3]
+    recent_opadmins = CheckLogin.objects.filter(created_by_id=request.current_actor.id).order_by('-created_on')[:3]
     for admin in recent_opadmins:
         operations.append({
             'timestamp': admin.created_on,
@@ -574,44 +610,75 @@ def OAdashboard(request):
 @opAdmin_only
 def OAprofile(request):
     # Render Operational Admin profile including creator info
-    admin_id = request.session.get('admin_id')
+    admin_id = request.current_actor.id
     try:
         admin = CheckLogin.objects.get(id=admin_id)
     except CheckLogin.DoesNotExist:
-        request.session.flush()
-        return redirect('login')
-    message = None
+        return clear_auth_cookies(redirect('login'))
+    password_modal_open = False
+    password_message = None
+    password_message_level = None
     # handle profile update including avatar upload
     if request.method == 'POST':
-        name = request.POST.get('name')
-        phone = request.POST.get('phone')
-        address = request.POST.get('address')
-        gender = request.POST.get('gender')
-        avatar_file = request.FILES.get('avatar')
-        # Debug prints to help trace incoming data
-        print('OAprofile POST data:', {'name': name, 'phone': phone, 'address': address, 'gender': gender, 'has_avatar': bool(avatar_file)})
+        form_type = request.POST.get('form_type')
+        current_password = request.POST.get('current_password')
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
 
-        if name:
-            admin.username = name
-        if phone is not None:
-            admin.phone = phone
-        if address is not None:
-            admin.address = address
-        if gender is not None:
-            admin.gender = gender
-        if avatar_file:
-            admin.avatar = avatar_file
+        if form_type == 'change_password':
+            password_modal_open = True
 
-        try:
-            admin.save()
-            # Use messages framework and PRG pattern to avoid double-post
-            messages.success(request, 'Profile updated successfully.')
-            return redirect('OAprofile')
-        except Exception as e:
-            # Log and show error message so we can diagnose upload/save problems
-            print('Error saving OAprofile:', str(e))
-            messages.error(request, f'Error saving profile: {e}')
-            # fallthrough to render the page with error message
+            if not current_password or not new_password or not confirm_password:
+                password_message = 'Please fill in all password fields.'
+                password_message_level = 'danger'
+            elif not admin.check_password(current_password):
+                password_message = 'Current password is incorrect.'
+                password_message_level = 'danger'
+            elif new_password != confirm_password:
+                password_message = 'New password and confirm password do not match.'
+                password_message_level = 'danger'
+            elif len(new_password) < 8:
+                password_message = 'New password must be at least 8 characters long.'
+                password_message_level = 'danger'
+            else:
+                try:
+                    admin.password = new_password
+                    admin.save()
+                    messages.success(request, 'Password changed successfully.')
+                    return redirect('OAprofile')
+                except Exception as e:
+                    print('Error changing OA password:', str(e))
+                    messages.error(request, f'Error changing password: {e}')
+        else:
+            name = request.POST.get('name')
+            phone = request.POST.get('phone')
+            address = request.POST.get('address')
+            gender = request.POST.get('gender')
+            avatar_file = request.FILES.get('avatar')
+            # Debug prints to help trace incoming data
+            print('OAprofile POST data:', {'name': name, 'phone': phone, 'address': address, 'gender': gender, 'has_avatar': bool(avatar_file)})
+
+            if name:
+                admin.username = name
+            if phone is not None:
+                admin.phone = phone
+            if address is not None:
+                admin.address = address
+            if gender is not None:
+                admin.gender = gender
+            if avatar_file:
+                admin.avatar = avatar_file
+
+            try:
+                admin.save()
+                # Use messages framework and PRG pattern to avoid double-post
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('OAprofile')
+            except Exception as e:
+                # Log and show error message so we can diagnose upload/save problems
+                print('Error saving OAprofile:', str(e))
+                messages.error(request, f'Error saving profile: {e}')
+                # fallthrough to render the page with error message
 
     creator = admin.created_by
     created_by_name = creator.username if creator and getattr(creator, 'username', None) else (creator.email if creator else 'System')
@@ -627,47 +694,459 @@ def OAprofile(request):
         'admissions_pending': 0,
         'unread_messages': 0,
         'recent_activities': [],
-        'message': message,
+        'password_modal_open': password_modal_open,
+        'password_message': password_message,
+        'password_message_level': password_message_level,
     }
     return render(request, 'Admin/OpAdmin/profile.html', context)
 
 
 
 
+def _get_next_id(model, pk_field):
+    last_record = model.objects.order_by(f'-{pk_field}').first()
+    return getattr(last_record, pk_field) + 1 if last_record else 1
+
+def _get_next_id(model, pk_field):
+    last_record = model.objects.order_by(f'-{pk_field}').first()
+    return getattr(last_record, pk_field) + 1 if last_record else 1
+
 @login_required
 @opAdmin_only
 def doctoradd(request):
-    return render(request, 'Admin/OpAdmin/doctor/add.html')  
+    context = {'errors': {}, 'name': '', 'specialization': '', 'phone': '', 'email': ''}
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        specialization = request.POST.get('specialization', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '').strip()
+
+        if not name:
+            context['errors']['name'] = 'Doctor name is required.'
+        if not specialization:
+            context['errors']['specialization'] = 'Specialization is required.'
+        if not phone:
+            context['errors']['phone'] = 'Phone number is required.'
+        if not email:
+            context['errors']['email'] = 'Email is required.'
+        if not password:
+            context['errors']['password'] = 'Password is required.'
+        if email and Doctor.objects.filter(Email__iexact=email).exists():
+            context['errors']['email'] = 'A doctor with that email already exists.'
+
+        context.update({'name': name, 'specialization': specialization, 'phone': phone, 'email': email})
+
+        if not context['errors']:
+            try:
+                Doctor.objects.create(
+                    DocID=_get_next_id(Doctor, 'DocID'),
+                    Dname=name,
+                    Specialization=specialization,
+                    Phone=phone,
+                    Email=email,
+                    Password=password,
+                    Status=True,
+                )
+                messages.success(request, 'Doctor added successfully.')
+                return redirect('doctormanage')
+            except Exception as e:
+                messages.error(request, f'Unable to add doctor: {e}')
+
+    return render(request, 'Admin/OpAdmin/doctor/add.html', context)
 
 @login_required
 @opAdmin_only
 def doctormanage(request):
-    return render(request, 'Admin/OpAdmin/doctor/manage.html')  
+    q = request.GET.get('q', '').strip()
+    doctors = Doctor.objects.all()
+
+    if request.method == 'POST':
+        delete_id = request.POST.get('delete_id')
+        if delete_id:
+            try:
+                doctor = Doctor.objects.get(DocID=delete_id)
+                doctor.delete()
+                messages.success(request, 'Doctor deleted successfully.')
+            except Doctor.DoesNotExist:
+                messages.error(request, 'Doctor not found.')
+            return redirect('doctormanage')
+
+    if q:
+        doctors = doctors.filter(
+            Q(Dname__icontains=q) |
+            Q(Specialization__icontains=q) |
+            Q(Email__icontains=q)
+        )
+
+    return render(request, 'Admin/OpAdmin/doctor/manage.html', {
+        'doctors': doctors,
+        'query': q,
+    })
 
 @login_required
 @opAdmin_only
 def helperadd(request):
-    return render(request, 'Admin/OpAdmin/helper/add.html')  
+    context = {'errors': {}, 'name': '', 'phone': '', 'email': ''}
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '').strip()
+
+        if not name:
+            context['errors']['name'] = 'Helper name is required.'
+        if not phone:
+            context['errors']['phone'] = 'Phone number is required.'
+        if not email:
+            context['errors']['email'] = 'Email is required.'
+        if not password:
+            context['errors']['password'] = 'Password is required.'
+        if email and Helper.objects.filter(Email__iexact=email).exists():
+            context['errors']['email'] = 'A helper with that email already exists.'
+
+        context.update({'name': name, 'phone': phone, 'email': email})
+
+        if not context['errors']:
+            try:
+                Helper.objects.create(
+                    HelperID=_get_next_id(Helper, 'HelperID'),
+                    Hname=name,
+                    Phone=phone,
+                    Email=email,
+                    Password=password,
+                    Status=True,
+                )
+                messages.success(request, 'Helper added successfully.')
+                return redirect('helpermanage')
+            except Exception as e:
+                messages.error(request, f'Unable to add helper: {e}')
+
+    return render(request, 'Admin/OpAdmin/helper/add.html', context)
 
 @login_required
 @opAdmin_only
 def helpermanage(request):
-    return render(request, 'Admin/OpAdmin/helper/manage.html')
+    q = request.GET.get('q', '').strip()
+    helpers = Helper.objects.all()
+
+    if request.method == 'POST':
+        delete_id = request.POST.get('delete_id')
+        if delete_id:
+            try:
+                helper = Helper.objects.get(HelperID=delete_id)
+                helper.delete()
+                messages.success(request, 'Helper deleted successfully.')
+            except Helper.DoesNotExist:
+                messages.error(request, 'Helper not found.')
+            return redirect('helpermanage')
+
+    if q:
+        helpers = helpers.filter(
+            Q(Hname__icontains=q) |
+            Q(Email__icontains=q) |
+            Q(Phone__icontains=q)
+        )
+
+    return render(request, 'Admin/OpAdmin/helper/manage.html', {
+        'helpers': helpers,
+        'query': q,
+    })
 
 @login_required
 @opAdmin_only
 def receptionistadd(request):
-    return render(request, 'Admin/OpAdmin/receptionist/add.html')  
+    context = {'errors': {}, 'name': '', 'phone': '', 'email': ''}
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '').strip()
+
+        if not name:
+            context['errors']['name'] = 'Receptionist name is required.'
+        if not phone:
+            context['errors']['phone'] = 'Phone number is required.'
+        if not email:
+            context['errors']['email'] = 'Email is required.'
+        if not password:
+            context['errors']['password'] = 'Password is required.'
+        if email and Receptionist.objects.filter(Email__iexact=email).exists():
+            context['errors']['email'] = 'A receptionist with that email already exists.'
+
+        context.update({'name': name, 'phone': phone, 'email': email})
+
+        if not context['errors']:
+            try:
+                Receptionist.objects.create(
+                    RecID=_get_next_id(Receptionist, 'RecID'),
+                    Rname=name,
+                    Phone=phone,
+                    Email=email,
+                    Password=password,
+                    Status=True,
+                )
+                messages.success(request, 'Receptionist added successfully.')
+                return redirect('receptionistmanage')
+            except Exception as e:
+                messages.error(request, f'Unable to add receptionist: {e}')
+
+    return render(request, 'Admin/OpAdmin/receptionist/add.html', context)
 
 @login_required
 @opAdmin_only
 def receptionistmanage(request):
-    return render(request, 'Admin/OpAdmin/receptionist/manage.html')
+    q = request.GET.get('q', '').strip()
+    receptionists = Receptionist.objects.all()
+
+    if request.method == 'POST':
+        delete_id = request.POST.get('delete_id')
+        if delete_id:
+            try:
+                receptionist = Receptionist.objects.get(RecID=delete_id)
+                receptionist.delete()
+                messages.success(request, 'Receptionist deleted successfully.')
+            except Receptionist.DoesNotExist:
+                messages.error(request, 'Receptionist not found.')
+            return redirect('receptionistmanage')
+
+    if q:
+        receptionists = receptionists.filter(
+            Q(Rname__icontains=q) |
+            Q(Email__icontains=q) |
+            Q(Phone__icontains=q)
+        )
+
+    return render(request, 'Admin/OpAdmin/receptionist/manage.html', {
+        'receptionists': receptionists,
+        'query': q,
+    })
 
 
 def logout(request):
-    request.session.flush()
-    return redirect("login")
+    return clear_auth_cookies(redirect("login"))
+
+
+def get_doctor_account(actor):
+    if not actor or actor.user_type != 'doctor':
+        return None
+    return Doctor.objects.filter(DocID=actor.id).first()
+
+
+def get_staff_account_by_actor(actor):
+    if not actor:
+        return None
+    if actor.user_type == 'doctor':
+        return Doctor.objects.filter(DocID=actor.id).first()
+    if actor.user_type == 'receptionist':
+        return Receptionist.objects.filter(RecID=actor.id).first()
+    if actor.user_type == 'helper':
+        return Helper.objects.filter(HelperID=actor.id).first()
+    return None
+
+
+@login_required
+@doctor_only
+def doctor_dashboard(request):
+    actor = request.current_actor
+    doctor = get_doctor_account(actor)
+    if not doctor:
+        return clear_auth_cookies(redirect('login'))
+
+    patients = Patient.objects.filter(DoctorID=doctor)
+    today = timezone.localdate()
+    today_patients = patients.filter(EntryDateandTime__date=today).count()
+    active_admissions = patients.filter(IsAdmitted=True, ExitDateandTime__isnull=True).count()
+    follow_ups = patients.filter(Medication='').count()
+    total_patients = patients.count()
+
+    recent_patients = patients.order_by('-EntryDateandTime')[:6]
+    history = []
+    for patient in recent_patients:
+        history.append({
+            'timestamp': patient.EntryDateandTime,
+            'patient': patient.Pname,
+            'status': 'Admitted' if patient.IsAdmitted else 'Released',
+            'source': 'Patient intake',
+        })
+
+    chart_labels = []
+    chart_data = []
+    for offset in range(6, -1, -1):
+        day = today - timedelta(days=offset)
+        chart_labels.append(day.strftime('%a'))
+        chart_data.append(patients.filter(EntryDateandTime__date=day).count())
+
+    context = {
+        'doctor': doctor,
+        'actor': actor,
+        'today_patients': today_patients,
+        'active_admissions': active_admissions,
+        'follow_ups': follow_ups,
+        'total_patients': total_patients,
+        'recent_patients': recent_patients,
+        'chart_labels': chart_labels,
+        'chart_data': chart_data,
+    }
+    return render(request, 'Admin/OpAdmin/doctor/dashboard.html', context)
+
+
+@login_required
+@doctor_only
+def doctor_profile(request):
+    actor = request.current_actor
+    doctor = get_doctor_account(actor)
+    if not doctor:
+        return clear_auth_cookies(redirect('login'))
+
+    profile_message = None
+    password_message = None
+    password_level = None
+
+    if request.method == 'POST':
+        form_type = request.POST.get('form_type')
+        if form_type == 'change_password':
+            current_password = request.POST.get('current_password')
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+
+            if not current_password or not new_password or not confirm_password:
+                password_message = 'Please fill in all password fields.'
+                password_level = 'danger'
+            elif not doctor.check_password(current_password):
+                password_message = 'Current password is incorrect.'
+                password_level = 'danger'
+            elif new_password != confirm_password:
+                password_message = 'New passwords do not match.'
+                password_level = 'danger'
+            elif len(new_password) < 8:
+                password_message = 'Password must be at least 8 characters long.'
+                password_level = 'danger'
+            else:
+                doctor.Password = new_password
+                try:
+                    doctor.save()
+                    messages.success(request, 'Password updated successfully.')
+                    return redirect('doctor_profile')
+                except Exception as e:
+                    password_message = f'Unable to update password: {e}'
+                    password_level = 'danger'
+        else:
+            name = request.POST.get('name')
+            phone = request.POST.get('phone')
+            email = request.POST.get('email')
+
+            doctor.Dname = name or doctor.Dname
+            doctor.Phone = phone or doctor.Phone
+            doctor.Email = email or doctor.Email
+
+            try:
+                doctor.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('doctor_profile')
+            except Exception as e:
+                profile_message = f'Unable to save profile: {e}'
+
+    context = {
+        'actor': actor,
+        'doctor': doctor,
+        'profile_message': profile_message,
+        'password_message': password_message,
+        'password_level': password_level,
+    }
+    return render(request, 'Admin/OpAdmin/doctor/profile.html', context)
+
+
+@login_required
+def staff_profile(request):
+    actor = request.current_actor
+    account = get_staff_account_by_actor(actor)
+    if not account:
+        return clear_auth_cookies(redirect('login'))
+
+    profile_message = None
+    profile_level = None
+    password_message = None
+    password_level = None
+
+    if request.method == 'POST':
+        form_type = request.POST.get('form_type')
+        if form_type == 'change_password':
+            current_password = request.POST.get('current_password')
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+
+            if not current_password or not new_password or not confirm_password:
+                password_message = 'Please fill in all password fields.'
+                password_level = 'danger'
+            elif not account.check_password(current_password):
+                password_message = 'Current password is incorrect.'
+                password_level = 'danger'
+            elif new_password != confirm_password:
+                password_message = 'New passwords do not match.'
+                password_level = 'danger'
+            elif len(new_password) < 8:
+                password_message = 'Password must be at least 8 characters long.'
+                password_level = 'danger'
+            else:
+                account.Password = new_password
+                try:
+                    account.save()
+                    messages.success(request, 'Password updated successfully.')
+                    return redirect('staff_profile')
+                except Exception as e:
+                    password_message = f'Unable to update password: {e}'
+                    password_level = 'danger'
+        else:
+            name = request.POST.get('name')
+            phone = request.POST.get('phone')
+            email = request.POST.get('email')
+
+            if actor.user_type == 'doctor':
+                account.Dname = name or account.Dname
+                account.Phone = phone or account.Phone
+                account.Email = email or account.Email
+            elif actor.user_type == 'receptionist':
+                account.Rname = name or account.Rname
+                account.Phone = phone or account.Phone
+                account.Email = email or account.Email
+            elif actor.user_type == 'helper':
+                account.Hname = name or account.Hname
+                account.Phone = phone or account.Phone
+                account.Email = email or account.Email
+
+            try:
+                account.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('staff_profile')
+            except Exception as e:
+                profile_message = f'Unable to save profile: {e}'
+                profile_level = 'danger'
+
+    context = {
+        'actor': actor,
+        'account': account,
+        'profile_message': profile_message,
+        'profile_level': profile_level,
+        'password_message': password_message,
+        'password_level': password_level,
+    }
+    return render(request, 'Admin/Staff/profile.html', context)
+
+
+@login_required
+def staff_dashboard(request):
+    actor = request.current_actor
+    context = {
+        'actor_name': actor.display_name,
+        'actor_email': actor.email,
+        'actor_role': actor.role.title(),
+        'patient_count': Patient.objects.count(),
+        'doctor_count': Doctor.objects.count(),
+        'receptionist_count': Receptionist.objects.count(),
+        'helper_count': Helper.objects.count(),
+    }
+    return render(request, 'Admin/Staff/dashboard.html', context)
 
 
 @already_authenticated
@@ -676,7 +1155,7 @@ def forgot_password(request):
     if request.method == 'POST':
         email = request.POST.get('email')
 
-        user = CheckLogin.objects.filter(email=email).first()
+        user, account_type = get_account_for_password_reset(email)
 
         if user:
             # Delete old tokens for this email
@@ -762,9 +1241,10 @@ def reset_password(request, token):
 
         # Update user password
         try:
-            user = CheckLogin.objects.get(email=reset_token.email)
-            user.password = password  # Will be hashed by the save method
-            user.save()
+            user, account_type = get_account_for_password_reset(reset_token.email)
+            if not user:
+                raise CheckLogin.DoesNotExist
+            set_account_password(user, account_type, password)
 
             # Mark token as used
             reset_token.is_used = True

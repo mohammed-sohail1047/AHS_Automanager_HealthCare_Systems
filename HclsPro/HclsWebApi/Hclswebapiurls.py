@@ -1,5 +1,21 @@
 from django.urls import path
-from .views import (AllAdminType, AdminTypeById, CreateAdminType, UpdateAdminType, DeleteAdminType, AllAdminLogin, AdminById, CreateAdmin, UpdateAdmin, DeleteAdmin)
+from .views import (
+    AllAdminType,
+    AdminTypeById,
+    CreateAdminType,
+    UpdateAdminType,
+    DeleteAdminType,
+    AllAdminLogin,
+    AdminById,
+    CreateAdmin,
+    UpdateAdmin,
+    DeleteAdmin,
+    RegisterAdmin,
+    AdminLoginAPI,
+    TokenRefreshAPIView,
+    LogoutAPIView,
+    CurrentActorAPIView,
+)
 
 urlpatterns = [
     path('admins/', AllAdminType.as_view(), name='all-admintypes'),
@@ -12,4 +28,9 @@ urlpatterns = [
     path('createadmin/', CreateAdmin.as_view(), name='create-admin'),
     path('updateadmin/', UpdateAdmin.as_view(), name='update-admin-'),
     path('deleteadmin/<int:Id>/', DeleteAdmin.as_view(), name='delete-admin-'),
+    path('auth/register/', RegisterAdmin.as_view(), name='register-admin'),
+    path('auth/login/', AdminLoginAPI.as_view(), name='jwt-login'),
+    path('auth/refresh/', TokenRefreshAPIView.as_view(), name='jwt-refresh'),
+    path('auth/logout/', LogoutAPIView.as_view(), name='jwt-logout'),
+    path('auth/me/', CurrentActorAPIView.as_view(), name='jwt-me'),
 ]

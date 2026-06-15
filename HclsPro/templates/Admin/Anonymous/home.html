@@ -3,6 +3,10 @@
 
 {% block title %}Home - Admin Panel{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/home-hero.css' %}">
+{% endblock %}
+
 {% block content %}
 
 <!-- Hero (home page only) -->
@@ -11,14 +15,16 @@
         <div class="row align-items-center">
             <div class="col-lg-7">
                 <h1 id="home-hero" class="display-4 fw-bold mb-3 brand-font">Welcome to AHS Pro</h1>
-                <p class="lead mb-4 opacity-75">Centralized hospital data, staffing and appointments — fast, secure, and simple.</p>
+                <p class="lead mb-4 opacity-75">Centralized hospital data, staffing and appointments - fast, secure, and simple.</p>
                 <div class="d-flex gap-3 mt-4">
                     <a href="{% url 'login' %}" class="btn btn-light text-primary fw-bold btn-lg px-4 shadow-sm" style="border-radius: var(--radius-lg);">Sign In</a>
-                    <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg px-4" style="border-radius: var(--radius-lg);">Create Account</a>
+                    <a href="{% url 'register' %}" class="btn btn-light text-primary fw-bold btn-lg px-4 shadow-sm" style="border-radius: var(--radius-lg);">Create Account</a>
                 </div>
             </div>
             <div class="col-lg-5 d-none d-lg-block text-center">
-                <!-- <img src="{% static 'images/hero-doctor.png' %}" alt="AHS illustration" class="img-fluid" style="max-height:260px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));"> -->
+                <div class="home-hero-image-wrap">
+                    <img src="{% static 'images/doc1.jpg' %}" alt="Doctor using the AHS Pro platform" class="home-hero-image">
+                </div>
             </div>
         </div>
     </div>
@@ -30,7 +36,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <h6 class="card-title text-muted">Hospitals</h6>
-                    <h3 class="card-text">{{ hospitals_count|default:'—' }}</h3>
+                    <h3 class="card-text">{{ hospitals_count|default:'-' }}</h3>
                 </div>
             </div>
         </div>
@@ -38,7 +44,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <h6 class="card-title text-muted">Doctors</h6>
-                    <h3 class="card-text">{{ doctors_count|default:'—' }}</h3>
+                    <h3 class="card-text">{{ doctors_count|default:'-' }}</h3>
                 </div>
             </div>
         </div>
@@ -46,7 +52,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <h6 class="card-title text-muted">Patients</h6>
-                    <h3 class="card-text">{{ patients_count|default:'—' }}</h3>
+                    <h3 class="card-text">{{ patients_count|default:'-' }}</h3>
                 </div>
             </div>
         </div>
@@ -54,7 +60,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <h6 class="card-title text-muted">Appointments</h6>
-                    <h3 class="card-text">{{ appointments_count|default:'—' }}</h3>
+                    <h3 class="card-text">{{ appointments_count|default:'-' }}</h3>
                 </div>
             </div>
         </div>
@@ -100,94 +106,23 @@
 
     <div class="row mt-5">
         <div class="col-12 text-center">
-            <button class="btn btn-outline-secondary" id="openContact">Contact Us</button>
+            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#contactModal">Contact Us</button>
         </div>
     </div>
 </div>
 
-<!-- Signup Modal -->
-<div class="modal fade" id="signupModal" tabindex="-1" aria-labelledby="signupModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="signupModalLabel">Sign up for AHS</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-3">Create an account to access full features. You can also continue as a guest to explore public data.</p>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'register' %}" class="btn btn-primary">Create Account</a>
-                    <a href="{% url 'login' %}" class="btn btn-outline-primary">Already have an account? Login</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Contact Modal -->
-<div class="modal fade" id="contactModal" tabindex="-1" aria-labelledby="contactModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="contactModalLabel">Contact AHS</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="contactForm">
-                    <div class="mb-3">
-                        <label for="contactEmail" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="contactEmail" placeholder="you@example.com" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="contactMessage" class="form-label">Message</label>
-                        <textarea class="form-control" id="contactMessage" rows="3" required></textarea>
-                    </div>
-                    <div class="d-grid">
-                        <button class="btn btn-primary" type="submit">Send</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
 <script>
-    (function(){
+    (function () {
         const search = document.getElementById('featureSearch');
         const list = document.getElementById('featureList');
+
         if (search && list) {
-            search.addEventListener('input', function(){
+            search.addEventListener('input', function () {
                 const q = this.value.trim().toLowerCase();
-                Array.from(list.children).forEach(li=>{
-                    const kws = (li.dataset.keywords||li.textContent).toLowerCase();
-                    li.style.display = q === '' || kws.indexOf(q) !== -1 ? '' : 'none';
+                Array.from(list.children).forEach(function (li) {
+                    const keywords = (li.dataset.keywords || li.textContent).toLowerCase();
+                    li.style.display = q === '' || keywords.indexOf(q) !== -1 ? '' : 'none';
                 });
-            });
-        }
-
-        const openContact = document.getElementById('openContact');
-        if (openContact) {
-            openContact.addEventListener('click', ()=>{
-                const contactModal = new bootstrap.Modal(document.getElementById('contactModal'));
-                contactModal.show();
-            });
-        }
-
-        const contactForm = document.getElementById('contactForm');
-        if (contactForm) {
-            contactForm.addEventListener('submit', function(e){
-                e.preventDefault();
-                // lightweight UX-only submission: show success then close
-                const btn = this.querySelector('button[type="submit"]');
-                btn.disabled = true; btn.textContent = 'Sending...';
-                setTimeout(()=>{
-                    btn.disabled = false; btn.textContent = 'Send';
-                    const m = bootstrap.Modal.getInstance(document.getElementById('contactModal'));
-                    m.hide();
-                    alert('Thank you — we will respond to ' + document.getElementById('contactEmail').value + '.');
-                    this.reset();
-                }, 800);
             });
         }
     })();

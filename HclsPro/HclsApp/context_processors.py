@@ -1,17 +1,12 @@
-from HclsWebApi.models import CheckLogin
-
 def admin_context(request):
-    """Adds `admin_name`, `admin_username`, and `admin_email` to template context when logged in via session."""
-    admin_id = request.session.get('admin_id')
-    if not admin_id:
+    """Adds authenticated actor details to template context."""
+    actor = getattr(request, 'current_actor', None)
+    if not actor:
         return {}
 
-    try:
-        admin = CheckLogin.objects.get(id=admin_id)
-        return {
-            'admin_name': getattr(admin, 'username', '') or getattr(admin, 'email', ''),
-            'admin_username': getattr(admin, 'username', ''),
-            'admin_email': getattr(admin, 'email', ''),
-        }
-    except CheckLogin.DoesNotExist:
-        return {}
+    return {
+        'admin_name': actor.display_name,
+        'admin_username': actor.display_name,
+        'admin_email': actor.email,
+        'current_role': actor.role,
+    }

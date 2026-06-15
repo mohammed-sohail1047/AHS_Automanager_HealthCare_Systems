@@ -1,0 +1,31 @@
+.home-hero-image-wrap {
+    position: relative;
+    max-width: 470px;
+    margin: 0 auto;
+    padding: 14px;
+}
+
+.home-hero-image-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 42px 0 0 42px;
+    border-radius: 32px;
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(249, 115, 22, 0.14));
+    z-index: 0;
+}
+
+.home-hero-image {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    max-height: 540px;
+    object-fit: cover;
+    border-radius: 28px;
+    border: 8px solid rgba(255, 255, 255, 0.88);
+    box-shadow: 0 24px 55px rgba(16, 42, 67, 0.2);
+}
+
+[data-theme="dark"] .home-hero-image {
+    border-color: rgba(13, 34, 52, 0.92);
+}

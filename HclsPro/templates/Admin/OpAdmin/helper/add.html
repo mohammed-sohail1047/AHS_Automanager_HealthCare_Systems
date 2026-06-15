@@ -22,6 +22,12 @@
             <form method="post" id="add-helper-form" novalidate>
                 {% csrf_token %}
 
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}" role="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+
                 <div class="mb-3">
                     <label for="id_name" class="form-label">Name</label>
                     <input type="text" class="form-control" id="id_name" name="name" placeholder="Full name" required value="{{ name|default:'' }}">
@@ -31,11 +37,27 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="id_email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="id_email" name="email" placeholder="Email address" required value="{{ email|default:'' }}">
+                    {% if errors.email %}
+                        <div class="invalid-feedback d-block">{{ errors.email }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
                     <label for="id_phone" class="form-label">Phone</label>
                     <input type="tel" class="form-control" id="id_phone" name="phone" inputmode="tel" pattern="^[0-9\-\+\s()]+$" placeholder="+91 555 555 5555" required value="{{ phone|default:'' }}">
                     <div class="form-text">Allowed: numbers, spaces, +, -, parentheses.</div>
                     {% if errors.phone %}
                         <div class="invalid-feedback d-block">{{ errors.phone }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="id_password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="id_password" name="password" placeholder="Set a password" required>
+                    {% if errors.password %}
+                        <div class="invalid-feedback d-block">{{ errors.password }}</div>
                     {% endif %}
                 </div>
 

@@ -19,25 +19,52 @@
                     <form method="post">
                         {% csrf_token %}
 
-                        <!-- Name -->
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }}" role="alert">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+
                         <div class="mb-3">
                             <label class="form-label">Doctor Name</label>
-                            <input type="text" name="name" class="form-control" placeholder="Enter doctor name" required>
+                            <input type="text" name="name" class="form-control" placeholder="Enter doctor name" required value="{{ name|default:'' }}">
+                            {% if errors.name %}
+                                <div class="invalid-feedback d-block">{{ errors.name }}</div>
+                            {% endif %}
                         </div>
 
-                        <!-- Specialization -->
                         <div class="mb-3">
                             <label class="form-label">Specialization</label>
-                            <input type="text" name="specialization" class="form-control" placeholder="Enter specialization" required>
+                            <input type="text" name="specialization" class="form-control" placeholder="Enter specialization" required value="{{ specialization|default:'' }}">
+                            {% if errors.specialization %}
+                                <div class="invalid-feedback d-block">{{ errors.specialization }}</div>
+                            {% endif %}
                         </div>
 
-                        <!-- Phone -->
                         <div class="mb-3">
                             <label class="form-label">Phone Number</label>
-                            <input type="text" name="phone" class="form-control" placeholder="Enter phone number" required>
+                            <input type="text" name="phone" class="form-control" placeholder="Enter phone number" required value="{{ phone|default:'' }}">
+                            {% if errors.phone %}
+                                <div class="invalid-feedback d-block">{{ errors.phone }}</div>
+                            {% endif %}
                         </div>
 
-                        <!-- Submit Button -->
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control" placeholder="Enter email" required value="{{ email|default:'' }}">
+                            {% if errors.email %}
+                                <div class="invalid-feedback d-block">{{ errors.email }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" name="password" class="form-control" placeholder="Enter password" required>
+                            {% if errors.password %}
+                                <div class="invalid-feedback d-block">{{ errors.password }}</div>
+                            {% endif %}
+                        </div>
+
                         <div class="d-grid">
                             <button type="submit" class="btn btn-success">
                                 <i class="bi bi-check-circle me-2"></i>

@@ -92,9 +92,19 @@ class Doctor(models.Model):
     Specialization = models.CharField(max_length=100)
     Phone = models.CharField(max_length=15)
     Email = models.EmailField()
+    Password = models.CharField(max_length=128, null=True, blank=True)
+    Status = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.DocID} {self.Dname}"
+
+    def save(self, *args, **kwargs):
+        if self.Password and not self.Password.startswith('pbkdf2_sha256$'):
+            self.Password = make_password(self.Password)
+        super().save(*args, **kwargs)
+
+    def check_password(self, raw_password):
+        return bool(self.Password) and check_password(raw_password, self.Password)
     
     class Meta:
         db_table = 'Doctor'
@@ -104,9 +114,19 @@ class Receptionist(models.Model):
     Rname = models.CharField(max_length=50)
     Phone = models.CharField(max_length=15)
     Email = models.EmailField()
+    Password = models.CharField(max_length=128, null=True, blank=True)
+    Status = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.RecID} {self.Rname}"
+
+    def save(self, *args, **kwargs):
+        if self.Password and not self.Password.startswith('pbkdf2_sha256$'):
+            self.Password = make_password(self.Password)
+        super().save(*args, **kwargs)
+
+    def check_password(self, raw_password):
+        return bool(self.Password) and check_password(raw_password, self.Password)
     
     class Meta:
         db_table = 'Receptionist'
@@ -116,9 +136,19 @@ class Helper(models.Model):
     Hname = models.CharField(max_length=50)
     Phone = models.CharField(max_length=15)
     Email = models.EmailField()
+    Password = models.CharField(max_length=128, null=True, blank=True)
+    Status = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.HelperID} {self.Hname}"
+
+    def save(self, *args, **kwargs):
+        if self.Password and not self.Password.startswith('pbkdf2_sha256$'):
+            self.Password = make_password(self.Password)
+        super().save(*args, **kwargs)
+
+    def check_password(self, raw_password):
+        return bool(self.Password) and check_password(raw_password, self.Password)
     
     class Meta:
         db_table = 'Helper'

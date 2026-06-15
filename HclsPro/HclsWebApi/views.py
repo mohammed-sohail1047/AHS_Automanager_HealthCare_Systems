@@ -2,9 +2,19 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from .Serializer import AdminTypeSerializer, AdminLoginSerializer, DepartmentSerializer, EmployeeSerializer, DoctorSerializer, ReceptionistSerializer, HelperSerializer, PatientSerializer, CheckLoginSerializer
 from .models import AdminType, AdminLogin, Department, Employee, Doctor, Receptionist, Helper, Patient, CheckLogin
 from drf_yasg.utils import swagger_auto_schema
+from .authentication import (
+    AuthenticationError,
+    apply_auth_cookies,
+    authenticate_user,
+    clear_auth_cookies,
+    decode_jwt_token,
+    get_actor_from_payload,
+    issue_token_pair,
+)
 
 # Create your views here.
 class AllAdminType(APIView):
@@ -177,6 +187,7 @@ class DeleteAdmin(APIView):
 
 
 class RegisterAdmin(APIView):
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = CheckLoginSerializer(data=request.data)
@@ -191,34 +202,93 @@ class RegisterAdmin(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class AdminLoginAPI(APIView):
+    permission_classes = [AllowAny]
 
     def post(self, request):
+        email = request.data.get("Email") or request.data.get("email")
+        password = request.data.get("Password") or request.data.get("password")
+        remember_me = bool(request.data.get("remember_me"))
 
-        email = request.data.get("Email")
-        password = request.data.get("Password")
+        result = authenticate_user(email, password)
+        if result["status"] == "inactive_admin":
+            admin = result["user"]
+            return Response({
+                "message": "Admin not activated",
+                "admin_id": admin.id,
+                "status": False,
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        if result["status"] in {"inactive_staff", "password_not_set"}:
+            return Response({
+                "message": result["message"],
+                "status": False,
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        if result["status"] != "ok":
+            return Response({
+                "message": "Invalid credentials. Please register.",
+                "status": False,
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        payload = result["payload"]
+        tokens = issue_token_pair(payload, remember_me=remember_me)
+        response = Response({
+            "message": "Login successful",
+            "status": True,
+            "role": payload["role"],
+            "user_type": payload["user_type"],
+            "user_id": payload["user_id"],
+            "email": payload["email"],
+            "display_name": payload["display_name"],
+            "access": tokens["access"],
+            "refresh": tokens["refresh"],
+        }, status=status.HTTP_200_OK)
+        return apply_auth_cookies(response, tokens, remember_me=remember_me)
+
+
+class TokenRefreshAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.data.get("refresh") or request.COOKIES.get("hcls_refresh_token")
+        if not refresh_token:
+            return Response({"message": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            admin = AdminLogin.objects.get(Email=email)
+            payload = decode_jwt_token(refresh_token, expected_type="refresh")
+        except AuthenticationError as exc:
+            return Response({"message": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Verify password using the check_password method
-            if not admin.check_password(password):
-                return Response({
-                    "message": "Invalid credentials. Please register."
-                }, status=404)
+        actor = get_actor_from_payload(payload)
+        if not actor:
+            return Response({"message": "User not found or inactive."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            if admin.Status == False:
-                return Response({
-                    "message": "Admin not activated",
-                    "admin_id": admin.id,
-                    "status": False
-                })
+        actor_payload = {
+            "user_type": actor.user_type,
+            "user_id": actor.user_id,
+            "role": actor.role,
+            "email": actor.email,
+            "display_name": actor.display_name,
+        }
+        tokens = issue_token_pair(actor_payload)
+        response = Response({"access": tokens["access"], "refresh": tokens["refresh"]}, status=status.HTTP_200_OK)
+        return apply_auth_cookies(response, tokens)
 
-            return Response({
-                "message": "Login successful",
-                "status": True
-            })
 
-        except AdminLogin.DoesNotExist:
-            return Response({
-                "message": "Invalid credentials. Please register."
-            }, status=404)
+class LogoutAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        return clear_auth_cookies(Response({"message": "Logged out successfully."}, status=status.HTTP_200_OK))
+
+
+class CurrentActorAPIView(APIView):
+    def get(self, request):
+        actor = request.user
+        return Response({
+            "user_id": actor.user_id,
+            "user_type": actor.user_type,
+            "role": actor.role,
+            "email": actor.email,
+            "display_name": actor.display_name,
+        }, status=status.HTTP_200_OK)

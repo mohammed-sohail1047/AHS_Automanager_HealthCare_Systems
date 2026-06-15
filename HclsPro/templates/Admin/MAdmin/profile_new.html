@@ -3,6 +3,16 @@
 
 {% block content %}
 <div class="container py-4">
+	{% if messages %}
+		<div class="mb-3">
+			{% for message in messages %}
+				<div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+					{{ message }}
+					<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+				</div>
+			{% endfor %}
+		</div>
+	{% endif %}
 	<div class="row g-4">
 		<div class="col-lg-4">
 			<div class="card card-modern text-center shadow-sm">
@@ -23,7 +33,7 @@
 
 					<div class="d-flex gap-2 justify-content-center">
 						<button id="showEditBtn" class="btn btn-rich">Edit Profile</button>
-						<button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#changePasswordModal">Change Password</button>
+						<button id="openChangePasswordModal" type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#changePasswordModal">Change Password</button>
 					</div>
 				</div>
 			</div>
@@ -232,19 +242,23 @@
 				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 			</div>
 			<div class="modal-body">
-				<form id="changePwdForm" method="post" action="#">
+				<form id="changePwdForm" method="post" action="{% url 'profile' %}">
 					{% csrf_token %}
+					<input type="hidden" name="form_type" value="change_password">
+					{% if password_message %}
+						<div class="alert alert-{{ password_message_level|default:'danger' }}">{{ password_message }}</div>
+					{% endif %}
 					<div class="mb-2">
 						<label class="form-label">Current password</label>
-						<input name="current_password" type="password" class="form-control" required>
+						<input name="current_password" type="password" class="form-control" autocomplete="current-password" required>
 					</div>
 					<div class="mb-2">
 						<label class="form-label">New password</label>
-						<input name="new_password" type="password" class="form-control" required>
+						<input name="new_password" type="password" class="form-control" autocomplete="new-password" required>
 					</div>
 					<div class="mb-2">
 						<label class="form-label">Confirm new password</label>
-						<input name="confirm_password" type="password" class="form-control" required>
+						<input name="confirm_password" type="password" class="form-control" autocomplete="new-password" required>
 					</div>
 						<div class="text-end">
 							<button id="changePwdBtn" class="btn btn-rich" type="submit">Change</button>
@@ -303,5 +317,40 @@
 	}
 })();
 </script>
+
+<script>
+(function () {
+	const trigger = document.getElementById('openChangePasswordModal');
+	const modalEl = document.getElementById('changePasswordModal');
+	const form = document.getElementById('changePwdForm');
+	const submitBtn = document.getElementById('changePwdBtn');
+
+	if (trigger && modalEl && typeof bootstrap !== 'undefined') {
+		trigger.addEventListener('click', function () {
+			const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+			modal.show();
+		});
+	}
+
+	if (form && submitBtn) {
+		form.addEventListener('submit', function () {
+			submitBtn.disabled = true;
+			submitBtn.textContent = 'Changing...';
+		});
+	}
+})();
+</script>
+
+{% if password_modal_open %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+	const modalEl = document.getElementById('changePasswordModal');
+	if (modalEl) {
+		const modal = new bootstrap.Modal(modalEl);
+		modal.show();
+	}
+});
+</script>
+{% endif %}
 
 {% endblock %}

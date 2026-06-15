@@ -31,8 +31,8 @@
                         <img src="{% static 'images/hospitallogo.png' %}" alt="AHS Logo" width="64" height="64" class="shadow-sm">
                     </a>
                     <div>
-                        <div class="h5 mb-0 brand-font fw-bold" style="background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AHS Pro</div>
-                        <div class="muted-small fw-medium">Hospital Management</div>
+                        <div class="h5 mb-0 brand-font fw-bold" style="background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary)); -webkit-background-clip: text;background-clip: text;  -webkit-text-fill-color: transparent;">AHS Pro</div>
+                        <div class="text-muted muted-small fw-medium">Hospital Management</div>
                     </div>
                 </div>
 
@@ -41,13 +41,13 @@
                         <button class="btn btn-sm btn-light position-relative rounded-circle p-2 mx-2" id="themeToggle" title="Toggle Dark Mode">
                             <i class="bi bi-moon-stars-fill" id="themeIcon"></i>
                         </button>
-                        <a class="btn btn-rich ghost nav-link fw-medium px-3 text-dark hover-primary" href="{% url 'home' %}">
+                        <a class="btn btn-rich primary nav-link fw-medium px-3  hover-primary shadow-sm" href="{% url 'home' %}">
                              Home
                         </a>
-                        <a class="btn btn-rich ghost nav-link fw-medium px-4 hover-primary" href="{% url 'login' %}">
+                        <a class="btn btn-rich primary nav-link fw-medium px-4 hover-primary shadow-sm" href="{% url 'login' %}">
                             Sign In
                         </a>
-                        <a class="btn btn-rich primary px-4 shadow-sm" href="{% url 'register' %}">
+                        <a class="btn btn-rich primary nav-link fw-medium px-4 hover-primary shadow-sm" href="{% url 'register' %}">
                             Register
                         </a>
                     </div>

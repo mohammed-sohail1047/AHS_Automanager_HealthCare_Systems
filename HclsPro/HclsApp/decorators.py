@@ -1,5 +1,6 @@
 from django.shortcuts import redirect
 from functools import wraps
+from HclsWebApi.authentication import get_dashboard_route_for_role
 
 
 def normalize_admin_type(admin_type):
@@ -22,7 +23,7 @@ def login_required(view_func):
     """Decorator to check if user is logged in"""
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-        if 'admin_id' not in request.session:
+        if not getattr(request, 'current_actor', None):
             return redirect('login')
         return view_func(request, *args, **kwargs)
     return wrapper
@@ -31,17 +32,9 @@ def login_required(view_func):
 def already_authenticated(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-        if 'admin_id' in request.session:
-            admin_type = normalize_admin_type(request.session.get('admin_type'))
-            
-            if admin_type == "OPADMIN":
-                return redirect('OAdashboard')
-            elif admin_type == "MADMIN":
-                return redirect('dashboard')
-            else:
-                # Clear corrupted session
-                request.session.flush()
-                return redirect('login')
+        actor = getattr(request, 'current_actor', None)
+        if actor:
+            return redirect(get_dashboard_route_for_role(actor.role))
         
         return view_func(request, *args, **kwargs)
     return wrapper
@@ -50,19 +43,14 @@ def already_authenticated(view_func):
 def mAdmin_only(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-
-        if 'admin_id' not in request.session:
+        actor = getattr(request, 'current_actor', None)
+        if not actor:
             return redirect('login')
 
-        admin_type = normalize_admin_type(request.session.get('admin_type'))
+        admin_type = normalize_admin_type(actor.role)
         
         if admin_type != "MADMIN":
-            # If they're an OpAdmin, redirect to their dashboard
-            if admin_type == "OPADMIN":
-                return redirect('OAdashboard')
-            # Otherwise, logout and redirect to login
-            request.session.flush()
-            return redirect('login')
+            return redirect(get_dashboard_route_for_role(admin_type))
 
         return view_func(request, *args, **kwargs)
 
@@ -72,19 +60,29 @@ def mAdmin_only(view_func):
 def opAdmin_only(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-
-        if 'admin_id' not in request.session:
+        actor = getattr(request, 'current_actor', None)
+        if not actor:
             return redirect('login')
 
-        admin_type = normalize_admin_type(request.session.get('admin_type'))
+        admin_type = normalize_admin_type(actor.role)
         
         if admin_type != "OPADMIN":
-            # If they're an MAdmin, redirect to their dashboard
-            if admin_type == "MADMIN":
-                return redirect('dashboard')
-            # Otherwise, logout and redirect to login
-            request.session.flush()
+            return redirect(get_dashboard_route_for_role(admin_type))
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def doctor_only(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        actor = getattr(request, 'current_actor', None)
+        if not actor:
             return redirect('login')
+
+        if str(actor.role).strip().upper() != "DOCTOR":
+            return redirect(get_dashboard_route_for_role(actor.role))
 
         return view_func(request, *args, **kwargs)
 
