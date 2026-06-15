@@ -1,4 +1,4 @@
-# HclsPro (ProjectHCLSDB)
+# AHS (Automanager HealthCare Systems)
 
 Minimal README to run the project locally.
 
