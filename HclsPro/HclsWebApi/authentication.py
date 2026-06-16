@@ -9,7 +9,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import authentication, exceptions
 
-from .models import CheckLogin, Doctor, Helper, Receptionist
+from .models import CheckLogin, Doctor, Helper, Receptionist, Patient
 
 
 def normalize_admin_type(admin_type):
@@ -167,9 +167,13 @@ def get_dashboard_route_for_role(role):
         return "OAdashboard"
     if normalized == "DOCTOR":
         return "doctor_dashboard"
-    if normalized in {"RECEPTIONIST", "HELPER"}:
-        return "staff_dashboard"
-    return "staff_dashboard"
+    if normalized == "RECEPTIONIST":
+        return "receptionist_dashboard"
+    if normalized == "HELPER":
+        return "helper_dashboard"
+    if normalized == "PATIENT":
+        return "patient_dashboard"
+    return "login"
 
 
 def _build_admin_actor(admin):
@@ -192,6 +196,10 @@ def _build_receptionist_actor(receptionist):
 
 def _build_helper_actor(helper):
     return build_actor_payload("helper", helper.HelperID, "HELPER", helper.Email, helper.Hname)
+
+
+def _build_patient_actor(patient):
+    return build_actor_payload("patient", patient.PatientID, "PATIENT", patient.Email, patient.Pname)
 
 
 def authenticate_user(email, password):
@@ -222,8 +230,14 @@ def authenticate_user(email, password):
             return {"status": "inactive_staff", "message": "Helper account is inactive."}
         return {"status": "ok", "payload": _build_helper_actor(helper)}
 
-    if Doctor.objects.filter(Email__iexact=email).exists() or Receptionist.objects.filter(Email__iexact=email).exists() or Helper.objects.filter(Email__iexact=email).exists():
-        return {"status": "password_not_set", "message": "This staff account does not have a usable password yet."}
+    patient = Patient.objects.filter(Email__iexact=email).first()
+    if patient and patient.check_password(password):
+        if not patient.Status:
+            return {"status": "inactive_staff", "message": "Patient account is inactive."}
+        return {"status": "ok", "payload": _build_patient_actor(patient)}
+
+    if Doctor.objects.filter(Email__iexact=email).exists() or Receptionist.objects.filter(Email__iexact=email).exists() or Helper.objects.filter(Email__iexact=email).exists() or Patient.objects.filter(Email__iexact=email).exists():
+        return {"status": "password_not_set", "message": "This account does not have a usable password yet."}
 
     return {"status": "invalid"}
 
@@ -248,6 +262,10 @@ def get_actor_from_payload(payload):
     if user_type == "helper":
         helper = Helper.objects.filter(HelperID=user_id, Email__iexact=email, Status=True).first()
         return AuthenticatedActor(**_build_helper_actor(helper)) if helper else None
+
+    if user_type == "patient":
+        patient = Patient.objects.filter(PatientID=user_id, Email__iexact=email, Status=True).first()
+        return AuthenticatedActor(**_build_patient_actor(patient)) if patient else None
 
     return None
 
@@ -285,6 +303,10 @@ def get_account_for_password_reset(email):
     helper = Helper.objects.filter(Email__iexact=email).first()
     if helper:
         return helper, "helper"
+
+    patient = Patient.objects.filter(Email__iexact=email).first()
+    if patient:
+        return patient, "patient"
 
     return None, None
 

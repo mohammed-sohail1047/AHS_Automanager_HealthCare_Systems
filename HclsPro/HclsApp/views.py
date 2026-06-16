@@ -13,7 +13,7 @@ from HclsWebApi.models import (
     Helper,
 )
 from django.contrib import messages
-from .decorators import login_required, mAdmin_only, opAdmin_only, already_authenticated, normalize_admin_type, doctor_only
+from .decorators import login_required, mAdmin_only, opAdmin_only, already_authenticated, normalize_admin_type, doctor_only, receptionist_only, helper_only, patient_only
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
@@ -953,6 +953,31 @@ def doctor_dashboard(request):
     if not doctor:
         return clear_auth_cookies(redirect('login'))
 
+    if request.method == 'POST':
+        patient_id = request.POST.get('patient_id')
+        prescription = request.POST.get('prescription', '').strip()
+        medication = request.POST.get('medication', '').strip()
+        is_admitted = request.POST.get('is_admitted') == 'on'
+
+        try:
+            patient = Patient.objects.get(PatientID=patient_id, DoctorID=doctor)
+            patient.Prescription = prescription
+            patient.Medication = medication
+
+            if is_admitted and not patient.IsAdmitted:
+                patient.ExitDateandTime = None
+            elif not is_admitted and patient.IsAdmitted:
+                patient.ExitDateandTime = timezone.now()
+
+            patient.IsAdmitted = is_admitted
+            patient.save()
+            messages.success(request, f"Medical records updated for {patient.Pname}.")
+        except Patient.DoesNotExist:
+            messages.error(request, "Patient record not found.")
+        except Exception as e:
+            messages.error(request, f"Error updating patient record: {e}")
+        return redirect('doctor_dashboard')
+
     patients = Patient.objects.filter(DoctorID=doctor)
     today = timezone.localdate()
     today_patients = patients.filter(EntryDateandTime__date=today).count()
@@ -988,7 +1013,7 @@ def doctor_dashboard(request):
         'chart_labels': chart_labels,
         'chart_data': chart_data,
     }
-    return render(request, 'Admin/OpAdmin/doctor/dashboard.html', context)
+    return render(request, 'Admin/Doctor/dashboard.html', context)
 
 
 @login_required
@@ -1054,7 +1079,7 @@ def doctor_profile(request):
         'password_message': password_message,
         'password_level': password_level,
     }
-    return render(request, 'Admin/OpAdmin/doctor/profile.html', context)
+    return render(request, 'Admin/Doctor/profile.html', context)
 
 
 @login_required
@@ -1262,3 +1287,472 @@ def reset_password(request, token):
     return render(request, 'Admin/Anonymous/reset_password.html', {
         'token': token
     })
+
+
+# Helper accounts fetchers
+def get_receptionist_account(actor):
+    if not actor or actor.user_type != 'receptionist':
+        return None
+    return Receptionist.objects.filter(RecID=actor.id).first()
+
+def get_helper_account(actor):
+    if not actor or actor.user_type != 'helper':
+        return None
+    return Helper.objects.filter(HelperID=actor.id).first()
+
+def get_patient_account(actor):
+    if not actor or actor.user_type != 'patient':
+        return None
+    return Patient.objects.filter(PatientID=actor.id).first()
+
+
+@login_required
+@receptionist_only
+def receptionist_dashboard(request):
+    actor = request.current_actor
+    receptionist = get_receptionist_account(actor)
+    if not receptionist:
+        return clear_auth_cookies(redirect('login'))
+
+    q = request.GET.get('q', '').strip()
+    patients = Patient.objects.all()
+
+    if q:
+        patients = patients.filter(
+            Q(Pname__icontains=q) |
+            Q(Email__icontains=q) |
+            Q(Phone__icontains=q)
+        )
+
+    patients = patients.order_by('-EntryDateandTime')
+    today = timezone.localdate()
+    
+    total_patients = Patient.objects.count()
+    active_admissions = Patient.objects.filter(IsAdmitted=True, ExitDateandTime__isnull=True).count()
+    today_patients = Patient.objects.filter(EntryDateandTime__date=today).count()
+    discharged_today = Patient.objects.filter(ExitDateandTime__date=today).count()
+
+    context = {
+        'receptionist': receptionist,
+        'actor': actor,
+        'patients': patients,
+        'query': q,
+        'total_patients': total_patients,
+        'active_admissions': active_admissions,
+        'today_patients': today_patients,
+        'discharged_today': discharged_today,
+    }
+    return render(request, 'Admin/Receptionist/dashboard.html', context)
+
+
+@login_required
+@receptionist_only
+def receptionist_profile(request):
+    actor = request.current_actor
+    receptionist = get_receptionist_account(actor)
+    if not receptionist:
+        return clear_auth_cookies(redirect('login'))
+
+    profile_message = None
+    password_message = None
+    password_level = None
+
+    if request.method == 'POST':
+        form_type = request.POST.get('form_type')
+        if form_type == 'change_password':
+            current_password = request.POST.get('current_password')
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+
+            if not current_password or not new_password or not confirm_password:
+                password_message = 'Please fill in all password fields.'
+                password_level = 'danger'
+            elif not receptionist.check_password(current_password):
+                password_message = 'Current password is incorrect.'
+                password_level = 'danger'
+            elif new_password != confirm_password:
+                password_message = 'New passwords do not match.'
+                password_level = 'danger'
+            elif len(new_password) < 8:
+                password_message = 'Password must be at least 8 characters long.'
+                password_level = 'danger'
+            else:
+                receptionist.Password = new_password
+                try:
+                    receptionist.save()
+                    messages.success(request, 'Password updated successfully.')
+                    return redirect('receptionist_profile')
+                except Exception as e:
+                    password_message = f'Unable to update password: {e}'
+                    password_level = 'danger'
+        else:
+            name = request.POST.get('name')
+            phone = request.POST.get('phone')
+            email = request.POST.get('email')
+
+            receptionist.Rname = name or receptionist.Rname
+            receptionist.Phone = phone or receptionist.Phone
+            receptionist.Email = email or receptionist.Email
+
+            try:
+                receptionist.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('receptionist_profile')
+            except Exception as e:
+                profile_message = f'Unable to save profile: {e}'
+
+    context = {
+        'actor': actor,
+        'account': receptionist,
+        'profile_message': profile_message,
+        'password_message': password_message,
+        'password_level': password_level,
+    }
+    return render(request, 'Admin/Receptionist/profile.html', context)
+
+
+@login_required
+@receptionist_only
+def patient_add(request):
+    actor = request.current_actor
+    receptionist = get_receptionist_account(actor)
+    if not receptionist:
+        return clear_auth_cookies(redirect('login'))
+
+    doctors = Doctor.objects.filter(Status=True)
+    helpers = Helper.objects.filter(Status=True)
+    
+    errors = {}
+    name = ''
+    age = ''
+    gender = 'Male'
+    phone = ''
+    email = ''
+    doctor_id = ''
+    helper_id = ''
+    prescription = ''
+    medication = ''
+    bill = '0'
+    password = ''
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        age = request.POST.get('age', '').strip()
+        gender = request.POST.get('gender', 'Male').strip()
+        phone = request.POST.get('phone', '').strip()
+        email = request.POST.get('email', '').strip()
+        doctor_id = request.POST.get('doctor', '').strip()
+        helper_id = request.POST.get('helper', '').strip()
+        prescription = request.POST.get('prescription', '').strip()
+        medication = request.POST.get('medication', '').strip()
+        bill = request.POST.get('bill', '0').strip()
+        password = request.POST.get('password', '').strip()
+
+        if not name:
+            errors['name'] = 'Patient name is required.'
+        if not age:
+            errors['age'] = 'Age is required.'
+        if not phone:
+            errors['phone'] = 'Phone number is required.'
+        if not email:
+            errors['email'] = 'Email is required.'
+        if not doctor_id:
+            errors['doctor'] = 'Doctor assignment is required.'
+        if not password:
+            errors['password'] = 'Login password is required.'
+        if email and Patient.objects.filter(Email__iexact=email).exists():
+            errors['email'] = 'A patient with this email is already registered.'
+
+        if not errors:
+            try:
+                Patient.objects.create(
+                    PatientID=_get_next_id(Patient, 'PatientID'),
+                    Pname=name,
+                    Age=int(age),
+                    Gender=gender,
+                    Phone=phone,
+                    Email=email,
+                    ReceptionistID=receptionist,
+                    DoctorID_id=int(doctor_id),
+                    HelperID_id=int(helper_id) if helper_id else None,
+                    Prescription=prescription,
+                    Medication=medication,
+                    Bill=bill,
+                    Password=password,
+                    Status=True,
+                    IsAdmitted=request.POST.get('is_admitted') == 'on'
+                )
+                messages.success(request, 'Patient registered successfully.')
+                return redirect('receptionist_dashboard')
+            except Exception as e:
+                messages.error(request, f'Unable to register patient: {e}')
+
+    context = {
+        'receptionist': receptionist,
+        'actor': actor,
+        'doctors': doctors,
+        'helpers': helpers,
+        'errors': errors,
+        'name': name,
+        'age': age,
+        'gender': gender,
+        'phone': phone,
+        'email': email,
+        'doctor_id': doctor_id,
+        'helper_id': helper_id,
+        'prescription': prescription,
+        'medication': medication,
+        'bill': bill,
+    }
+    return render(request, 'Admin/Receptionist/patient_add.html', context)
+
+
+@login_required
+@receptionist_only
+def patient_edit(request, id):
+    actor = request.current_actor
+    receptionist = get_receptionist_account(actor)
+    if not receptionist:
+        return clear_auth_cookies(redirect('login'))
+
+    try:
+        patient = Patient.objects.get(PatientID=id)
+    except Patient.DoesNotExist:
+        messages.error(request, 'Patient not found.')
+        return redirect('receptionist_dashboard')
+
+    doctors = Doctor.objects.filter(Status=True)
+    helpers = Helper.objects.filter(Status=True)
+    errors = {}
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        age = request.POST.get('age', '').strip()
+        gender = request.POST.get('gender', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        email = request.POST.get('email', '').strip()
+        doctor_id = request.POST.get('doctor', '').strip()
+        helper_id = request.POST.get('helper', '').strip()
+        prescription = request.POST.get('prescription', '').strip()
+        medication = request.POST.get('medication', '').strip()
+        bill = request.POST.get('bill', '').strip()
+        password = request.POST.get('password', '').strip()
+        is_admitted = request.POST.get('is_admitted') == 'on'
+
+        if not name:
+            errors['name'] = 'Patient name is required.'
+        if not age:
+            errors['age'] = 'Age is required.'
+        if not phone:
+            errors['phone'] = 'Phone number is required.'
+        if not email:
+            errors['email'] = 'Email is required.'
+        if email and Patient.objects.filter(Email__iexact=email).exclude(PatientID=id).exists():
+            errors['email'] = 'A patient with this email already exists.'
+
+        if not errors:
+            try:
+                patient.Pname = name
+                patient.Age = int(age)
+                patient.Gender = gender
+                patient.Phone = phone
+                patient.Email = email
+                patient.DoctorID_id = int(doctor_id)
+                patient.HelperID_id = int(helper_id) if helper_id else None
+                patient.Prescription = prescription
+                patient.Medication = medication
+                patient.Bill = bill
+                if password:
+                    patient.Password = password
+                
+                # Handle discharge exit timestamp
+                if is_admitted and not patient.IsAdmitted:
+                    patient.ExitDateandTime = None
+                elif not is_admitted and patient.IsAdmitted:
+                    patient.ExitDateandTime = timezone.now()
+                
+                patient.IsAdmitted = is_admitted
+                patient.save()
+                messages.success(request, 'Patient updated successfully.')
+                return redirect('receptionist_dashboard')
+            except Exception as e:
+                messages.error(request, f'Unable to save patient: {e}')
+
+    context = {
+        'receptionist': receptionist,
+        'actor': actor,
+        'patient': patient,
+        'doctors': doctors,
+        'helpers': helpers,
+        'errors': errors,
+    }
+    return render(request, 'Admin/Receptionist/patient_edit.html', context)
+
+
+@login_required
+@helper_only
+def helper_dashboard(request):
+    actor = request.current_actor
+    helper = get_helper_account(actor)
+    if not helper:
+        return clear_auth_cookies(redirect('login'))
+
+    patients = Patient.objects.filter(HelperID=helper).order_by('-EntryDateandTime')
+    active_admissions = patients.filter(IsAdmitted=True, ExitDateandTime__isnull=True).count()
+
+    context = {
+        'helper': helper,
+        'actor': actor,
+        'patients': patients,
+        'active_admissions': active_admissions,
+        'total_patients': patients.count(),
+    }
+    return render(request, 'Admin/Helper/dashboard.html', context)
+
+
+@login_required
+@helper_only
+def helper_profile(request):
+    actor = request.current_actor
+    helper = get_helper_account(actor)
+    if not helper:
+        return clear_auth_cookies(redirect('login'))
+
+    profile_message = None
+    password_message = None
+    password_level = None
+
+    if request.method == 'POST':
+        form_type = request.POST.get('form_type')
+        if form_type == 'change_password':
+            current_password = request.POST.get('current_password')
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+
+            if not current_password or not new_password or not confirm_password:
+                password_message = 'Please fill in all password fields.'
+                password_level = 'danger'
+            elif not helper.check_password(current_password):
+                password_message = 'Current password is incorrect.'
+                password_level = 'danger'
+            elif new_password != confirm_password:
+                password_message = 'New passwords do not match.'
+                password_level = 'danger'
+            elif len(new_password) < 8:
+                password_message = 'Password must be at least 8 characters long.'
+                password_level = 'danger'
+            else:
+                helper.Password = new_password
+                try:
+                    helper.save()
+                    messages.success(request, 'Password updated successfully.')
+                    return redirect('helper_profile')
+                except Exception as e:
+                    password_message = f'Unable to update password: {e}'
+                    password_level = 'danger'
+        else:
+            name = request.POST.get('name')
+            phone = request.POST.get('phone')
+            email = request.POST.get('email')
+
+            helper.Hname = name or helper.Hname
+            helper.Phone = phone or helper.Phone
+            helper.Email = email or helper.Email
+
+            try:
+                helper.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('helper_profile')
+            except Exception as e:
+                profile_message = f'Unable to save profile: {e}'
+
+    context = {
+        'actor': actor,
+        'account': helper,
+        'profile_message': profile_message,
+        'password_message': password_message,
+        'password_level': password_level,
+    }
+    return render(request, 'Admin/Helper/profile.html', context)
+
+
+@login_required
+@patient_only
+def patient_dashboard(request):
+    actor = request.current_actor
+    patient = get_patient_account(actor)
+    if not patient:
+        return clear_auth_cookies(redirect('login'))
+
+    context = {
+        'patient': patient,
+        'actor': actor,
+        'doctor': patient.DoctorID,
+        'receptionist': patient.ReceptionistID,
+        'helper': patient.HelperID,
+    }
+    return render(request, 'Admin/Patient/dashboard.html', context)
+
+
+@login_required
+@patient_only
+def patient_profile(request):
+    actor = request.current_actor
+    patient = get_patient_account(actor)
+    if not patient:
+        return clear_auth_cookies(redirect('login'))
+
+    profile_message = None
+    password_message = None
+    password_level = None
+
+    if request.method == 'POST':
+        form_type = request.POST.get('form_type')
+        if form_type == 'change_password':
+            current_password = request.POST.get('current_password')
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+
+            if not current_password or not new_password or not confirm_password:
+                password_message = 'Please fill in all password fields.'
+                password_level = 'danger'
+            elif not patient.check_password(current_password):
+                password_message = 'Current password is incorrect.'
+                password_level = 'danger'
+            elif new_password != confirm_password:
+                password_message = 'New passwords do not match.'
+                password_level = 'danger'
+            elif len(new_password) < 8:
+                password_message = 'Password must be at least 8 characters long.'
+                password_level = 'danger'
+            else:
+                patient.Password = new_password
+                try:
+                    patient.save()
+                    messages.success(request, 'Password updated successfully.')
+                    return redirect('patient_profile')
+                except Exception as e:
+                    password_message = f'Unable to update password: {e}'
+                    password_level = 'danger'
+        else:
+            phone = request.POST.get('phone')
+            email = request.POST.get('email')
+
+            patient.Phone = phone or patient.Phone
+            patient.Email = email or patient.Email
+
+            try:
+                patient.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('patient_profile')
+            except Exception as e:
+                profile_message = f'Unable to save profile: {e}'
+
+    context = {
+        'actor': actor,
+        'account': patient,
+        'profile_message': profile_message,
+        'password_message': password_message,
+        'password_level': password_level,
+    }
+    return render(request, 'Admin/Patient/profile.html', context)

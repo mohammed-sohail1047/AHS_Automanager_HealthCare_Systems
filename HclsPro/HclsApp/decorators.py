@@ -88,3 +88,48 @@ def doctor_only(view_func):
 
     return wrapper
 
+
+def receptionist_only(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        actor = getattr(request, 'current_actor', None)
+        if not actor:
+            return redirect('login')
+
+        if str(actor.role).strip().upper() != "RECEPTIONIST":
+            return redirect(get_dashboard_route_for_role(actor.role))
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def helper_only(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        actor = getattr(request, 'current_actor', None)
+        if not actor:
+            return redirect('login')
+
+        if str(actor.role).strip().upper() != "HELPER":
+            return redirect(get_dashboard_route_for_role(actor.role))
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def patient_only(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        actor = getattr(request, 'current_actor', None)
+        if not actor:
+            return redirect('login')
+
+        if str(actor.role).strip().upper() != "PATIENT":
+            return redirect(get_dashboard_route_for_role(actor.role))
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+

@@ -1,0 +1,117 @@
+{% extends 'Admin/Helper/helperbase.html' %}
+{% load static %}
+
+{% block title %}Helper Dashboard - AHS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Status Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Total Assigned Patients</div>
+                        <h3 class="mb-0 fw-bold">{{ total_patients }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-teal-soft p-3 text-teal">
+                        <i class="bi bi-people-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Active Admissions (Ward Care)</div>
+                        <h3 class="mb-0 fw-bold">{{ active_admissions }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-amber-soft p-3 text-amber">
+                        <i class="bi bi-hospital-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patients List -->
+    <div class="card border-0 shadow-sm rounded-3 p-4">
+        <h5 class="brand-font mb-4">Assigned Support Patients</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr class="table-light">
+                        <th>Patient ID</th>
+                        <th>Name</th>
+                        <th>Age / Gender</th>
+                        <th>Primary Doctor</th>
+                        <th>Entry Time</th>
+                        <th>Medication Checklist</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in patients %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark fw-bold border">#{{ p.PatientID }}</span></td>
+                            <td>
+                                <div class="fw-bold">{{ p.Pname }}</div>
+                                <small class="text-muted">{{ p.Phone }}</small>
+                            </td>
+                            <td>{{ p.Age }} yrs / {{ p.Gender }}</td>
+                            <td>
+                                <div class="fw-semibold">Dr. {{ p.DoctorID.Dname }}</div>
+                                <small class="text-muted">{{ p.DoctorID.Specialization }}</small>
+                            </td>
+                            <td>{{ p.EntryDateandTime|date:"M d, Y H:i" }}</td>
+                            <td>
+                                <div class="p-2 bg-light rounded text-dark small" style="max-width: 250px;">
+                                    <i class="bi bi-file-earmark-medical text-primary me-1"></i>
+                                    {{ p.Medication|default:"No medication directives." }}
+                                </div>
+                            </td>
+                            <td>
+                                {% if p.IsAdmitted %}
+                                    <span class="badge bg-danger">Inpatient (Ward)</span>
+                                {% else %}
+                                    <span class="badge bg-success">Outpatient (Released)</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-person-hearts fs-1 d-block mb-3"></i>
+                                No patients assigned to your care yet.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-teal-soft { background-color: rgba(20, 184, 166, 0.15); }
+.text-teal { color: #0f766e; }
+.bg-amber-soft { background-color: rgba(245, 158, 11, 0.15); }
+.text-amber { color: #b45309; }
+.card-summary { transition: transform 0.2s; }
+.card-summary:hover { transform: translateY(-3px); }
+</style>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends 'Admin/Receptionist/receptionistbase.html' %}
+{% load static %}
+
+{% block title %}Edit Patient - AHS{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card border-0 shadow-sm rounded-3 p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="brand-font mb-0">Update Patient Records: {{ patient.Pname }}</h4>
+                    <a href="{% url 'receptionist_dashboard' %}" class="btn btn-sm btn-outline-secondary rounded-pill">Back to Dashboard</a>
+                </div>
+
+                <form method="post" action="" class="needs-validation">
+                    {% csrf_token %}
+                    
+                    <h5 class="border-bottom pb-2 mb-3 brand-font text-teal">1. Personal Details</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Full Name</label>
+                            <input name="name" type="text" class="form-control {% if errors.name %}is-invalid{% endif %}" value="{{ patient.Pname }}" required>
+                            {% if errors.name %}<div class="invalid-feedback">{{ errors.name }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Age</label>
+                            <input name="age" type="number" class="form-control {% if errors.age %}is-invalid{% endif %}" value="{{ patient.Age }}" min="0" max="150" required>
+                            {% if errors.age %}<div class="invalid-feedback">{{ errors.age }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Gender</label>
+                            <select name="gender" class="form-select">
+                                <option value="Male" {% if patient.Gender == 'Male' %}selected{% endif %}>Male</option>
+                                <option value="Female" {% if patient.Gender == 'Female' %}selected{% endif %}>Female</option>
+                                <option value="Other" {% if patient.Gender == 'Other' %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone Number</label>
+                            <input name="phone" type="tel" class="form-control {% if errors.phone %}is-invalid{% endif %}" value="{{ patient.Phone }}" required>
+                            {% if errors.phone %}<div class="invalid-feedback">{{ errors.phone }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email Address</label>
+                            <input name="email" type="email" class="form-control {% if errors.email %}is-invalid{% endif %}" value="{{ patient.Email }}" required>
+                            {% if errors.email %}<div class="invalid-feedback">{{ errors.email }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <h5 class="border-bottom pb-2 mb-3 brand-font text-teal">2. Clinical Handoffs</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Assign Primary Doctor</label>
+                            <select name="doctor" class="form-select" required>
+                                {% for d in doctors %}
+                                    <option value="{{ d.DocID }}" {% if patient.DoctorID.DocID == d.DocID %}selected{% endif %}>Dr. {{ d.Dname }} ({{ d.Specialization }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Assign Helper / Nurse (Optional)</label>
+                            <select name="helper" class="form-select">
+                                <option value="">No Helper Assignment</option>
+                                {% for h in helpers %}
+                                    <option value="{{ h.HelperID }}" {% if patient.HelperID.HelperID == h.HelperID %}selected{% endif %}>{{ h.Hname }} (Support Care)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <h5 class="border-bottom pb-2 mb-3 brand-font text-teal">3. Medical Status & Fees</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-12">
+                            <label class="form-label">Prescription Notes</label>
+                            <input name="prescription" type="text" class="form-control" value="{{ patient.Prescription }}">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Medications</label>
+                            <input name="medication" type="text" class="form-control" value="{{ patient.Medication }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Total Fee / Bill</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input name="bill" type="text" class="form-control" value="{{ patient.Bill }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="form-check form-switch mt-4">
+                                <input name="is_admitted" class="form-check-input" type="checkbox" role="switch" id="admitSwitch" {% if patient.IsAdmitted %}checked{% endif %}>
+                                <label class="form-check-label fw-semibold" for="admitSwitch">Keep Patient Admitted</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="border-bottom pb-2 mb-3 brand-font text-teal">4. Portal Credentials (Optional)</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-12">
+                            <label class="form-label">Reset Portal Password</label>
+                            <input name="password" type="password" class="form-control" placeholder="Leave blank to keep current password">
+                            <small class="text-muted">Only specify if you wish to override the patient's existing dashboard password.</small>
+                        </div>
+                    </div>
+
+                    <div class="text-end border-top pt-3 mt-4">
+                        <button type="submit" class="btn btn-primary rounded-pill px-5">Save Patient Updates</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.text-teal { color: #0f766e; }
+</style>
+{% endblock %}

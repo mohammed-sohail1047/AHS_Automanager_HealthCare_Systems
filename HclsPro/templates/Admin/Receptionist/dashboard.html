@@ -1,0 +1,175 @@
+{% extends 'Admin/Receptionist/receptionistbase.html' %}
+{% load static %}
+
+{% block title %}Receptionist Dashboard - AHS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Status Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Total Registered</div>
+                        <h3 class="mb-0 fw-bold">{{ total_patients }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-teal-soft p-3 text-teal">
+                        <i class="bi bi-people-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Today's Check-ins</div>
+                        <h3 class="mb-0 fw-bold">{{ today_patients }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-blue-soft p-3 text-blue">
+                        <i class="bi bi-clock-history fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Inpatients Admitted</div>
+                        <h3 class="mb-0 fw-bold">{{ active_admissions }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-amber-soft p-3 text-amber">
+                        <i class="bi bi-hospital-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Discharged Today</div>
+                        <h3 class="mb-0 fw-bold">{{ discharged_today }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-success-soft p-3 text-success">
+                        <i class="bi bi-check2-circle fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions & Search -->
+    <div class="card border-0 shadow-sm rounded-3 p-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <h5 class="brand-font mb-0">Patient Directory</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <form method="get" action="" class="d-flex gap-2">
+                    <input name="q" type="search" class="form-control form-control-sm rounded-pill px-3" placeholder="Search patients..." value="{{ query }}">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill">Search</button>
+                    {% if query %}
+                        <a href="{% url 'receptionist_dashboard' %}" class="btn btn-sm btn-light rounded-pill">Clear</a>
+                    {% endif %}
+                </form>
+                <a href="{% url 'patient_add' %}" class="btn btn-rich primary btn-sm rounded-pill"><i class="bi bi-person-plus-fill"></i> Register Patient</a>
+            </div>
+        </div>
+
+        <div class="table-responsive mt-4">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr class="table-light">
+                        <th>Patient ID</th>
+                        <th>Name</th>
+                        <th>Contact</th>
+                        <th>Age / Gender</th>
+                        <th>Assigned Doctor</th>
+                        <th>Assigned Helper</th>
+                        <th>Status</th>
+                        <th>Medication / Bill</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in patients %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark fw-bold border">#{{ p.PatientID }}</span></td>
+                            <td>
+                                <div class="fw-bold">{{ p.Pname }}</div>
+                                <small class="text-muted">Registered: {{ p.EntryDateandTime|date:"M d, Y H:i" }}</small>
+                            </td>
+                            <td>
+                                <div>{{ p.Phone }}</div>
+                                <small class="text-muted">{{ p.Email }}</small>
+                            </td>
+                            <td>{{ p.Age }} yrs / {{ p.Gender }}</td>
+                            <td>
+                                <div class="fw-semibold">Dr. {{ p.DoctorID.Dname }}</div>
+                                <small class="text-muted">{{ p.DoctorID.Specialization }}</small>
+                            </td>
+                            <td>
+                                {% if p.HelperID %}
+                                    <span>{{ p.HelperID.Hname }}</span>
+                                {% else %}
+                                    <span class="text-muted small">None</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if p.IsAdmitted %}
+                                    <span class="badge bg-danger">Admitted</span>
+                                {% else %}
+                                    <span class="badge bg-success">Released</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div><span class="text-truncate d-inline-block" style="max-width: 120px;">{{ p.Medication|default:"Not Medicated" }}</span></div>
+                                <small class="text-primary font-monospace">${{ p.Bill }}</small>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'patient_edit' p.PatientID %}" class="btn btn-sm btn-rich secondary rounded-pill">
+                                    <i class="bi bi-pencil-fill"></i> Edit
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <i class="bi bi-people fs-1 d-block mb-3"></i>
+                                No patients registered yet or matching criteria.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-teal-soft { background-color: rgba(20, 184, 166, 0.15); }
+.text-teal { color: #0f766e; }
+.bg-blue-soft { background-color: rgba(59, 130, 246, 0.15); }
+.text-blue { color: #1d4ed8; }
+.bg-amber-soft { background-color: rgba(245, 158, 11, 0.15); }
+.text-amber { color: #b45309; }
+.bg-success-soft { background-color: rgba(34, 197, 94, 0.15); }
+.text-success { color: #15803d; }
+.card-summary { transition: transform 0.2s; }
+.card-summary:hover { transform: translateY(-3px); }
+</style>
+{% endblock %}

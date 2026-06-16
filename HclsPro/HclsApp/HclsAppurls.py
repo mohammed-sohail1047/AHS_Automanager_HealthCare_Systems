@@ -30,4 +30,18 @@ urlpatterns = [
     path('helpermanage/', views.helpermanage, name='helpermanage'),
     path('receptionistadd/', views.receptionistadd, name='receptionistadd'),
     path('receptionistmanage/', views.receptionistmanage, name='receptionistmanage'),
+    
+    # Receptionist specific routes
+    path('receptionist/dashboard/', views.receptionist_dashboard, name='receptionist_dashboard'),
+    path('receptionist/profile/', views.receptionist_profile, name='receptionist_profile'),
+    path('receptionist/patient/add/', views.patient_add, name='patient_add'),
+    path('receptionist/patient/edit/<int:id>/', views.patient_edit, name='patient_edit'),
+    
+    # Helper specific routes
+    path('helper/dashboard/', views.helper_dashboard, name='helper_dashboard'),
+    path('helper/profile/', views.helper_profile, name='helper_profile'),
+    
+    # Patient specific routes
+    path('patient/dashboard/', views.patient_dashboard, name='patient_dashboard'),
+    path('patient/profile/', views.patient_profile, name='patient_profile'),
 ]

@@ -1,0 +1,159 @@
+{% extends 'Admin/Patient/patientbase.html' %}
+{% load static %}
+
+{% block title %}My Health Dashboard - AHS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Top Admission Status banner -->
+    <div class="row mb-4">
+        <div class="col-12">
+            {% if patient.IsAdmitted %}
+                <div class="alert alert-danger d-flex align-items-center gap-3 border-0 shadow-sm p-4 rounded-3 m-0">
+                    <i class="bi bi-hospital fs-2"></i>
+                    <div>
+                        <h5 class="fw-bold mb-1">Current Status: Inpatient (Admitted)</h5>
+                        <p class="mb-0 small">You are currently admitted to the hospital ward. Admission date: {{ patient.EntryDateandTime|date:"M d, Y H:i" }}. Please notify your doctor or care helper if you need assistance.</p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-success d-flex align-items-center gap-3 border-0 shadow-sm p-4 rounded-3 m-0">
+                    <i class="bi bi-check2-circle fs-2"></i>
+                    <div>
+                        <h5 class="fw-bold mb-1">Current Status: Outpatient (Released)</h5>
+                        <p class="mb-0 small">You are currently checked out. Release date: {{ patient.ExitDateandTime|date:"M d, Y H:i"|default:"Not specified" }}. Check-in date: {{ patient.EntryDateandTime|date:"M d, Y H:i" }}.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Medical Log & Prescriptions -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-3 p-4 mb-4">
+                <h5 class="brand-font text-teal mb-4"><i class="bi bi-prescription text-primary me-2"></i>Clinical Evaluation & Prescription</h5>
+                <div class="mb-4">
+                    <label class="text-muted small fw-bold uppercase">Diagnosis / Symptoms Note</label>
+                    <div class="p-3 bg-light rounded border-start border-4 border-teal mt-1">
+                        <p class="mb-0 fw-semibold">{{ patient.Prescription|default:"No prescription details have been recorded yet." }}</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="text-muted small fw-bold uppercase">Medication Directives</label>
+                    <div class="p-3 bg-light rounded border-start border-4 border-primary mt-1">
+                        <p class="mb-0 fw-semibold">{{ patient.Medication|default:"No medication directives set yet." }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-3 p-4">
+                <h5 class="brand-font text-teal mb-4"><i class="bi bi-cash-stack text-primary me-2"></i>Billing & Financial Summary</h5>
+                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded-3">
+                    <div>
+                        <div class="text-muted small">Total Outstanding Balance</div>
+                        <h3 class="mb-0 fw-bold font-monospace text-primary">${{ patient.Bill|default:"0.00" }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-amber-soft text-amber px-3 py-2 rounded-pill fw-semibold">Payment Due</span>
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-3">Please visit the hospital billing desk or use receptionist services to settle outstanding statements.</small>
+            </div>
+        </div>
+
+        <!-- Assigned Care Team -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 p-4 mb-4">
+                <h5 class="brand-font text-teal mb-4"><i class="bi bi-people-fill text-primary me-2"></i>Your Care Team</h5>
+                
+                <!-- Doctor -->
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="rounded-circle bg-teal-soft p-3 text-teal">
+                        <i class="bi bi-heart-pulse-fill fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Primary Doctor</div>
+                        <div class="fw-bold text-dark">Dr. {{ doctor.Dname }}</div>
+                        <small class="text-muted">{{ doctor.Specialization }}</small>
+                    </div>
+                </div>
+
+                <!-- Helper -->
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="rounded-circle bg-amber-soft p-3 text-amber">
+                        <i class="bi bi-person-hearts fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Care Helper / Support Nurse</div>
+                        {% if helper %}
+                            <div class="fw-bold text-dark">{{ helper.Hname }}</div>
+                            <small class="text-muted">Ward Assistance</small>
+                        {% else %}
+                            <div class="text-muted small">Not assigned yet</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Receptionist -->
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-blue-soft p-3 text-blue">
+                        <i class="bi bi-headset fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Desk Receptionist</div>
+                        {% if receptionist %}
+                            <div class="fw-bold text-dark">{{ receptionist.Rname }}</div>
+                            <small class="text-muted">Admissions desk</small>
+                        {% else %}
+                            <div class="text-muted small">System registered</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Summary -->
+            <div class="card border-0 shadow-sm rounded-3 p-4">
+                <h5 class="brand-font text-teal mb-3"><i class="bi bi-person-circle text-primary me-2"></i>My File</h5>
+                <div class="mb-2">
+                    <small class="text-muted">Age / Gender:</small>
+                    <span class="fw-semibold ms-2">{{ patient.Age }} years old / {{ patient.Gender }}</span>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Phone:</small>
+                    <span class="fw-semibold ms-2">{{ patient.Phone }}</span>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted">Patient ID:</small>
+                    <span class="badge bg-light text-dark fw-bold border ms-2">#{{ patient.PatientID }}</span>
+                </div>
+                <a href="{% url 'patient_profile' %}" class="btn btn-outline-primary btn-sm w-100 rounded-pill mt-2">Edit Profile Settings</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-teal-soft { background-color: rgba(20, 184, 166, 0.15); }
+.text-teal { color: #0f766e; }
+.bg-blue-soft { background-color: rgba(59, 130, 246, 0.15); }
+.text-blue { color: #1d4ed8; }
+.bg-amber-soft { background-color: rgba(245, 158, 11, 0.15); }
+.text-amber { color: #b45309; }
+.uppercase { text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+{% endblock %}

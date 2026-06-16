@@ -1,0 +1,270 @@
+{% extends 'Admin/Doctor/doctorbase.html' %}
+{% load static %}
+
+{% block title %}Doctor Dashboard - AHS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Status Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Total Patients</div>
+                        <h3 class="mb-0 fw-bold">{{ total_patients }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-teal-soft p-3 text-teal">
+                        <i class="bi bi-people fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Today's Patients</div>
+                        <h3 class="mb-0 fw-bold">{{ today_patients }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-blue-soft p-3 text-blue">
+                        <i class="bi bi-calendar-check fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Active Admissions</div>
+                        <h3 class="mb-0 fw-bold">{{ active_admissions }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-amber-soft p-3 text-amber">
+                        <i class="bi bi-hospital fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-summary bg-white border-0 shadow-sm rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small">Pending Follow-ups</div>
+                        <h3 class="mb-0 fw-bold">{{ follow_ups }}</h3>
+                    </div>
+                    <div class="rounded-circle bg-red-soft p-3 text-red">
+                        <i class="bi bi-clipboard-pulse fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart & Queue -->
+    <div class="row g-4">
+        <!-- Chart -->
+        <div class="col-xl-7">
+            <div class="card border-0 shadow-sm rounded-3 p-4 mb-4">
+                <h5 class="brand-font mb-4">Weekly Patient Intake</h5>
+                <canvas id="patientChart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Patients Queue -->
+        <div class="col-xl-5">
+            <div class="card border-0 shadow-sm rounded-3 p-4">
+                <h5 class="brand-font mb-4">Today's Queue</h5>
+                <div class="table-responsive" style="max-height: 300px;">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr class="table-light">
+                                <th>Patient</th>
+                                <th>Gender</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in recent_patients %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">{{ p.Pname }}</div>
+                                        <small class="text-muted">ID: {{ p.PatientID }}</small>
+                                    </td>
+                                    <td>{{ p.Gender }}</td>
+                                    <td>
+                                        {% if p.IsAdmitted %}
+                                            <span class="badge bg-danger">Admitted</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Released</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center py-4 text-muted">No queue data.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Patient list and diagnosis editor -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-3 p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="brand-font mb-0">Assigned Patients Medical Records</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr class="table-light">
+                                <th>Patient Info</th>
+                                <th>Age / Gender</th>
+                                <th>Phone</th>
+                                <th>Status</th>
+                                <th>Prescription</th>
+                                <th>Medication</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in recent_patients %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ p.Pname }}</div>
+                                        <small class="text-muted">{{ p.Email }}</small>
+                                    </td>
+                                    <td>{{ p.Age }} yrs / {{ p.Gender }}</td>
+                                    <td>{{ p.Phone }}</td>
+                                    <td>
+                                        {% if p.IsAdmitted %}
+                                            <span class="badge bg-danger">Admitted</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Outpatient</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="text-truncate d-inline-block" style="max-width: 150px;">{{ p.Prescription|default:"None" }}</span></td>
+                                    <td><span class="text-truncate d-inline-block" style="max-width: 150px;">{{ p.Medication|default:"None" }}</span></td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-rich primary" data-bs-toggle="modal" data-bs-target="#editModal{{ p.PatientID }}">
+                                            <i class="bi bi-pencil-square"></i> Diagnose
+                                        </button>
+                                    </td>
+                                </tr>
+
+                                <!-- Diagnosis Modal -->
+                                <div class="modal fade" id="editModal{{ p.PatientID }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <form method="post" action="">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="patient_id" value="{{ p.PatientID }}">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title font-title">Clinical Update: {{ p.Pname }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Prescription (Symptoms/Diagnosis)</label>
+                                                        <textarea name="prescription" class="form-control" rows="3" required>{{ p.Prescription }}</textarea>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Medications (dosage & timing)</label>
+                                                        <textarea name="medication" class="form-control" rows="2" required>{{ p.Medication }}</textarea>
+                                                    </div>
+                                                    <div class="form-check form-switch mb-3">
+                                                        <input name="is_admitted" class="form-check-input" type="checkbox" role="switch" id="admitSwitch{{ p.PatientID }}" {% if p.IsAdmitted %}checked{% endif %}>
+                                                        <label class="form-check-label" for="admitSwitch{{ p.PatientID }}">Keep Admitted in Ward</label>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-primary">Save Diagnosis</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">No assigned patients found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const ctx = document.getElementById('patientChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [{
+                label: 'Patients Admitted',
+                data: {{ chart_data|safe }},
+                borderColor: '#14b8a6',
+                backgroundColor: 'rgba(20, 184, 166, 0.1)',
+                tension: 0.3,
+                fill: true,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.bg-teal-soft { background-color: rgba(20, 184, 166, 0.15); }
+.text-teal { color: #0f766e; }
+.bg-blue-soft { background-color: rgba(59, 130, 246, 0.15); }
+.text-blue { color: #1d4ed8; }
+.bg-amber-soft { background-color: rgba(245, 158, 11, 0.15); }
+.text-amber { color: #b45309; }
+.bg-red-soft { background-color: rgba(239, 68, 68, 0.15); }
+.text-red { color: #b91c1c; }
+.card-summary { transition: transform 0.2s; }
+.card-summary:hover { transform: translateY(-3px); }
+</style>
+{% endblock %}

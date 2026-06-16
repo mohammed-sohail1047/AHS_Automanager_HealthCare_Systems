@@ -1,0 +1,108 @@
+{% extends 'Admin/Doctor/doctorbase.html' %}
+{% load static %}
+
+{% block title %}Doctor Profile - AHS{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row gy-4">
+        <div class="col-lg-4">
+            <div class="card text-center border-0 shadow-sm rounded-3">
+                <div class="card-body p-4">
+                    <div class="mb-3 position-relative d-inline-block">
+                        <img src="{% static 'images/hlogo2.png' %}" alt="Profile avatar" class="rounded-circle border border-3 border-light shadow" width="120" height="120">
+                    </div>
+                    <h4 class="mb-1 fw-bold brand-font">{{ actor.display_name }}</h4>
+                    <p class="text-muted mb-2">{{ actor.email }}</p>
+                    <span class="badge bg-teal-soft text-teal px-3 py-2 rounded-pill">{{ actor.role|title }}</span>
+                </div>
+            </div>
+
+            <div class="card mt-3 border-0 shadow-sm rounded-3">
+                <div class="card-body p-4">
+                    <h5 class="card-title brand-font mb-3">Quick Navigation</h5>
+                    <a href="{% url 'doctor_dashboard' %}" class="btn btn-outline-primary w-100 mb-2 rounded-pill">Return to Dashboard</a>
+                    <a href="{% url 'logout' %}" class="btn btn-outline-danger w-100 rounded-pill">Log Out</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="card mb-4 border-0 shadow-sm rounded-3">
+                <div class="card-body p-4">
+                    <h5 class="card-title brand-font mb-4">Profile Details</h5>
+                    {% if profile_message %}
+                        <div class="alert alert-danger">{{ profile_message }}</div>
+                    {% endif %}
+                    <form method="post" action="" class="row g-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="update_profile">
+                        <div class="col-md-6">
+                            <label class="form-label">Full Name</label>
+                            <input name="name" type="text" class="form-control" value="{{ doctor.Dname }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input name="phone" type="tel" class="form-control" value="{{ doctor.Phone }}" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Email Address</label>
+                            <input name="email" type="email" class="form-control" value="{{ doctor.Email }}" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Specialization</label>
+                            <input type="text" class="form-control" value="{{ doctor.Specialization }}" readonly disabled>
+                            <small class="text-muted">Specialization details can only be updated by the administration.</small>
+                        </div>
+                        <div class="col-12 text-end mt-4">
+                            <button type="submit" class="btn btn-primary rounded-pill px-4">Save Profile Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-body p-4">
+                    <h5 class="card-title brand-font mb-4">Change Password</h5>
+                    {% if password_message %}
+                        <div class="alert alert-{{ password_level|default:'danger' }}">{{ password_message }}</div>
+                    {% endif %}
+                    <form method="post" action="" class="row g-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="change_password">
+                        <div class="col-md-12">
+                            <label class="form-label">Current Password</label>
+                            <input name="current_password" type="password" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">New Password</label>
+                            <input name="new_password" type="password" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Confirm New Password</label>
+                            <input name="confirm_password" type="password" class="form-control" required>
+                        </div>
+                        <div class="col-12 text-end mt-4">
+                            <button type="submit" class="btn btn-outline-primary rounded-pill px-4">Update Password</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-teal-soft { background-color: rgba(20, 184, 166, 0.15); }
+.text-teal { color: #0f766e; }
+</style>
+{% endblock %}
