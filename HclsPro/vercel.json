@@ -8,7 +8,7 @@
     }
   ],
   "installCommand": "pip install -r requirements.txt",
-  "buildCommand": "python manage.py collectstatic --noinput",
+  "buildCommand": "python manage.py collectstatic --noinput && mkdir -p public/static && cp -r staticfiles/* public/static/",
   "routes": [
     { "src": "/static/(.*)", "dest": "/staticfiles/$1" },
     { "src": "/media/(.*)", "dest": "/media/$1" },
