@@ -2,15 +2,16 @@
   "version": 2,
   "builds": [
     {
-      "src": "HclsPro/HclsPro/wsgi.py",
+      "src": "wsgi.py",
       "use": "@vercel/python",
       "config": { "maxLambdaSize": "50mb" }
     }
   ],
-  "installCommand": "pip install -r HclsPro/requirements.txt",
+  "installCommand": "pip install -r requirements.txt",
+  "buildCommand": "python manage.py collectstatic --noinput",
   "routes": [
-    { "src": "/static/(.*)", "dest": "/static/$1" },
+    { "src": "/static/(.*)", "dest": "/staticfiles/$1" },
     { "src": "/media/(.*)", "dest": "/media/$1" },
-    { "src": "/(.*)", "dest": "HclsPro/HclsPro/wsgi.py" }
+    { "src": "/(.*)", "dest": "wsgi.py" }
   ]
 }
