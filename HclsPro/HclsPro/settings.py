@@ -132,13 +132,24 @@ DATABASES = {
             "DB_ENGINE",
             "django.db.backends.mysql"
         ),
-        "NAME": os.environ.get("DB_NAME", "hclsdb"),
-        "USER": os.environ.get("DB_USER", "root"),
+        "NAME": os.environ.get("DB_NAME"),
+        "USER": os.environ.get("DB_USER"),
         "PASSWORD": os.environ.get("DB_PASSWORD"),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "3306"),
+        "HOST": os.environ.get("DB_HOST"),
+        "PORT": os.environ.get("DB_PORT", "4000"),
     }
 }
+
+
+if os.environ.get("DB_SSL_ENABLED", "False").lower() == "true":
+
+    DB_SSL_CA = BASE_DIR / "isrgrootx1.pem"
+
+    DATABASES["default"]["OPTIONS"] = {
+        "ssl": {
+            "ca": str(DB_SSL_CA),
+        }
+    }
 
 # TiDB Cloud requires TLS for public connections
 if os.environ.get("DB_SSL_ENABLED", "False").lower() == "true":
