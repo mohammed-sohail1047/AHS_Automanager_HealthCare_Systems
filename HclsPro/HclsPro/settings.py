@@ -13,26 +13,63 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(BASE_DIR / ".env")
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# ============================================================
+# SECURITY
+# ============================================================
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# Read SECRET_KEY from environment for safety; fallback to existing key for development
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-ppe#m9^1uewzs+#l3k@w^my_(5i#b_(19xwp78t!ck=t0wlapa')
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# Use environment variable DJANGO_DEBUG ('True' or 'False') to control this
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+if not SECRET_KEY:
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY is missing. "
+        "Set it as an environment variable."
+    )
 
-ALLOWED_HOSTS = os.environ.get(
-    "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,.vercel.app"
-).split(",")
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1,.vercel.app,ahs-automanager-health-care-systems.vercel.app"
+    ).split(",")
+    if host.strip()
+]
+
+# ============================================================
+# PRODUCTION SECURITY
+# ============================================================
+
+SECURE_SSL_REDIRECT = not DEBUG
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+SECURE_REFERRER_POLICY = "same-origin"
+
+X_FRAME_OPTIONS = "DENY"
+
+# Required when your frontend/API is accessed through HTTPS
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        ""
+    ).split(",")
+    if origin.strip()
+]
 
 # Application definition
 
@@ -79,22 +116,48 @@ TEMPLATES = [
     },
 ]
 
+
 WSGI_APPLICATION = 'HclsPro.wsgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# ============================================================
+# DATABASE
+# ============================================================
+
+# ============================================================
+# DATABASE
+# ============================================================
+
 DATABASES = {
-    'default': {
-        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.mysql'),
-        'NAME': os.environ.get('DB_NAME', 'hclsdb'),
-        'USER': os.environ.get('DB_USER', 'root'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'Sohail12'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '3306'),
+    "default": {
+        "ENGINE": os.environ.get(
+            "DB_ENGINE",
+            "django.db.backends.mysql"
+        ),
+        "NAME": os.environ.get("DB_NAME", "hclsdb"),
+        "USER": os.environ.get("DB_USER", "root"),
+        "PASSWORD": os.environ.get("DB_PASSWORD"),
+        "HOST": os.environ.get("DB_HOST", "localhost"),
+        "PORT": os.environ.get("DB_PORT", "3306"),
     }
 }
+
+# TiDB Cloud requires TLS for public connections
+if os.environ.get("DB_SSL_ENABLED", "False").lower() == "true":
+    DB_SSL_CA = os.environ.get(
+        "DB_SSL_CA",
+        str(BASE_DIR / "isrgrootx1.pem")
+    )
+
+    DATABASES["default"]["OPTIONS"] = {
+        "ssl": {
+            "ca": DB_SSL_CA,
+        }
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -130,11 +193,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+# Static files
+STATIC_URL = '/static/'
 
-# Adding Manual Code here:
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-STATICFILES_DIRS = [ BASE_DIR / "static",]
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 
 # Email Configuration for Password Reset
 # Default to console backend for development; override with EMAIL_BACKEND env var for production

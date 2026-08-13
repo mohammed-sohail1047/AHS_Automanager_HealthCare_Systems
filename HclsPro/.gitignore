@@ -1,1 +1,29 @@
-.vercel
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+prohclsenv/
+
+# Django
+staticfiles/
+media/
+*.log
+
+# SSL certificates
+*.pem
+
+# IDE
+.vscode/
+.idea/
