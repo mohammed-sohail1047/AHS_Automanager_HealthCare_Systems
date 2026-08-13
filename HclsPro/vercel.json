@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "HclsPro/HclsPro/wsgi.py", "use": "@vercel/python", "config": { "maxLambdaSize": "50mb" } }
+  ],
+  "routes": [
+    { "src": "/static/(.*)", "dest": "/static/$1" },
+    { "src": "/media/(.*)", "dest": "/media/$1" },
+    { "src": "/(.*)", "dest": "HclsPro/HclsPro/wsgi.py" }
+  ]
+}
