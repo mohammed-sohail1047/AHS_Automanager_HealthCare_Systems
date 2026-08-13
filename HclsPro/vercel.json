@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "wsgi.py",
-      "use": "@vercel/python",
-      "config": { "maxLambdaSize": "50mb" }
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
   ],
-  "installCommand": "pip install -r requirements.txt",
-  "buildCommand": "python manage.py collectstatic --noinput && mkdir -p public/static && cp -r staticfiles/* public/static/",
   "routes": [
-    { "src": "/(.*)", "dest": "wsgi.py" }
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
+    }
   ]
 }
